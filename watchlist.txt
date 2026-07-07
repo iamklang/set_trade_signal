@@ -1,0 +1,7 @@
+# SET DW Swing — alert watchlist (one symbol per line, .BK suffix).
+# alert.py checks each for the confirmed BUY(dip) trigger after the SET close.
+# Edit freely; lines after # are comments.
+KCE.BK
+CCET.BK
+AOT.BK
+ERW.BK

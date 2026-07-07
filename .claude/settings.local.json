@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.investing.com)",
+      "WebFetch(domain:www.set.or.th)",
+      "Bash(/tmp/btenv/bin/python scan_dip.py)",
+      "Bash(/tmp/btenv/bin/python *)",
+      "Bash(/tmp/btenv/bin/pip show *)",
+      "Bash(/tmp/btenv/bin/pip install *)",
+      "WebFetch(domain:en.wikipedia.org)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --no-sandbox --virtual-time-budget=20000 --dump-dom '--user-agent=Mozilla/5.0 \\(Macintosh; Intel Mac OS X 10_15_7\\) AppleWebKit/537.36 \\(KHTML, like Gecko\\) Chrome/131.0.0.0 Safari/537.36' https://www.set.or.th/th/market/index/set100/overview)",
+      "Bash(chmod +x /Users/klang/Git/trading_dr/scan)",
+      "Bash(/Users/klang/Git/trading_dr/scan --asof 2026-06-24)"
+    ]
+  }
+}

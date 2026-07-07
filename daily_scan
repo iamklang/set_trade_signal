@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# daily_scan — unified EOD pipeline: dip scan (+composite rank +incremental validate) THEN
+# bull scan (writes bull_msg.txt for the alert to fold in). One launchd job, run 17:00 after
+# the SET close — Yahoo posts the same-day EOD bar in the evening, so no need to wait for
+# morning. Guarantees ordering (bull reads composite_rank.csv the dip step just wrote).
+# Self-heals the venv (macOS may wipe /tmp; venv lives at ~/.venvs/trading-dr).
+set -euo pipefail
+
+PROJ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV="$HOME/.venvs/trading-dr"
+PY="$VENV/bin/python"
+
+if [ ! -x "$PY" ] || ! "$PY" -c "import pandas, playwright" >/dev/null 2>&1; then
+  echo "venv missing/broken at $VENV — (re)creating it (one-time, ~1–2 min)…" >&2
+  rm -rf "$VENV"
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q --upgrade pip
+  "$VENV/bin/pip" install -q yfinance pandas numpy exchange-calendars playwright
+  "$PY" -m playwright install chromium >&2
+fi
+
+cd "$PROJ"
+echo "===== daily_scan @ $(date '+%Y-%m-%d %H:%M') ====="
+echo "--- 1/2 dip scan + composite rank + validate ---"
+"$PY" scan_dip.py --composite "$@"
+echo "--- 2/3 bull scan (writes bull_msg.txt; LINE folded into the 17:30 alert) ---"
+"$PY" scan_bull.py --no-line
+echo "--- 3/3 collect NVDR snapshot (builds foreign-flow history for a future weak signal) ---"
+"$PY" collect_nvdr.py || echo "  (NVDR collect failed — non-fatal, core pipeline unaffected)"

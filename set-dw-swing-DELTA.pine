@@ -1,0 +1,101 @@
+//@version=6
+// =============================================================================
+// set-dw-swing-DELTA.pine — DELTA-tuned BUY(dip) indicator for TradingView.
+//
+// Mirrors setdw_signal.buy_signal with DELTA's forward-validated profile:
+//   dip-buy core  + vol >= 1.5x avg  + ADX(14) >= 25  + RSI(14) in [55, 70]
+// (rsi60 was overfit and removed; volume-surge + ADX>=25 + RSI<=70 cap were the
+//  validated accuracy levers — combo fwd ~88% / PF~8 but n=16, so TENTATIVE.)
+//
+// Apply on a DELTA *Daily* chart. Pine's ta.rsi / ta.dmi use Wilder smoothing,
+// matching the Python single-source-of-truth, so signals line up with the scanner.
+// Not financial advice. Re-derive levels from live data.
+// =============================================================================
+indicator("SET DW Swing — DELTA", overlay = true, max_labels_count = 200, max_lines_count = 200)
+
+// ---- inputs (DELTA validated defaults) --------------------------------------
+emaLen   = input.int(20,   "EMA len",            group = "Trend")
+smaLen   = input.int(200,  "SMA len",            group = "Trend")
+rsiMin   = input.int(55,   "RSI min",            group = "DELTA filters")
+rsiMax   = input.int(70,   "RSI max (cap)",      group = "DELTA filters")
+adxMin   = input.int(25,   "ADX min",            group = "DELTA filters")
+volMult  = input.float(1.5,"Volume >= x * avg",  group = "DELTA filters", step = 0.1)
+proxPct  = input.float(1.5,"Dip proximity to EMA %", group = "DELTA filters", step = 0.1)
+lookDip  = input.int(5,    "Dip lookback (bars)",   group = "Structure")
+lookStop = input.int(10,   "Swing-low stop lookback", group = "Structure")
+rr1      = input.float(1.0,"Target 1 (R)",  group = "Risk", step = 0.1)
+rr2      = input.float(1.5,"Target 2 (R)",  group = "Risk", step = 0.1)
+equity   = input.float(1000000, "Account equity", group = "Risk")
+riskPct  = input.float(1.0,"Risk % per trade",  group = "Risk", step = 0.1)
+showLvls = input.bool(true,"Draw entry/stop/T1/T2 lines", group = "Display")
+
+prox = proxPct / 100.0
+
+// ---- indicators (Wilder via ta.* — matches setdw_signal) --------------------
+ema    = ta.ema(close, emaLen)
+sma    = ta.sma(close, smaLen)
+rsi    = ta.rsi(close, 14)
+[_dip, _dim, adx] = ta.dmi(14, 14)
+volSma = ta.sma(volume, 20)
+llLook = ta.lowest(low, lookDip)
+llStop = ta.lowest(low, lookStop)
+
+emaUp = ema >= ema[1]
+smaUp = sma >= sma[5]
+
+// ---- BUY(dip) signal — exact mirror of buy_signal() with DELTA cfg -----------
+trendUp  = close > ema and emaUp and ema > sma and smaUp
+freshDip = llLook <= ema * (1 + prox) and low[1] <= ema[1] * (1 + prox)
+green    = close > open and close >= high[1]
+rsiOK    = rsi >= rsiMin and rsi <= rsiMax
+adxOK    = adx >= adxMin
+volOK    = volume > volSma * volMult
+buyRaw   = trendUp and freshDip and green and rsiOK and adxOK and volOK
+buy      = buyRaw and barstate.isconfirmed              // no intrabar repaint
+
+// ---- trade plan (on the signal bar) -----------------------------------------
+riskU = close - llStop
+qty   = riskU > 0 ? math.floor((equity * riskPct / 100) / riskU) : 0
+t1    = close + rr1 * riskU
+t2    = close + rr2 * riskU
+distPct = (close / ema - 1) * 100
+
+// ---- plotting ---------------------------------------------------------------
+plot(ema, "EMA20", color = color.new(color.orange, 0), linewidth = 2)
+plot(sma, "SMA200", color = color.new(color.gray, 40))
+
+barcolor(trendUp ? color.new(color.green, 60) : color.new(color.red, 70))
+
+plotshape(buy, title = "BUY", style = shape.labelup, location = location.belowbar,
+          color = color.new(color.green, 0), text = "BUY", textcolor = color.white, size = size.small)
+
+// active-trade rails (drawn on each confirmed BUY)
+if buy and showLvls
+    line.new(bar_index, llStop, bar_index + 12, llStop, color = color.red,   style = line.style_dashed, width = 1)
+    line.new(bar_index, t1,     bar_index + 12, t1,     color = color.green, style = line.style_dotted, width = 1)
+    line.new(bar_index, t2,     bar_index + 12, t2,     color = color.green, style = line.style_dotted, width = 1)
+    label.new(bar_index, llStop,
+       text  = str.format("DELTA BUY @ {0,number,#.##}\nstop {1,number,#.##}  T1 {2,number,#.##}  T2 {3,number,#.##}\nsize {4,number,#} | RSI {5,number,#} ADX {6,number,#} vol {7,number,#.#}x",
+                 close, llStop, t1, t2, qty, rsi, adx, volume / volSma),
+       style = label.style_label_up, color = color.new(color.green, 20), textcolor = color.white, size = size.small)
+
+// ---- info / ACTION panel ----------------------------------------------------
+var table tb = table.new(position.top_right, 2, 8, border_width = 1)
+f_row(i, k, v, col) =>
+    table.cell(tb, 0, i, k, text_color = color.white, text_size = size.small, bgcolor = color.new(color.black, 30))
+    table.cell(tb, 1, i, v, text_color = col, text_size = size.small, bgcolor = color.new(color.black, 30))
+
+if barstate.islast
+    state = buyRaw ? "BUY (dip)" : (trendUp ? "HOLD — uptrend, wait dip" : "STAND ASIDE — no uptrend")
+    scol  = buyRaw ? color.lime : (trendUp ? color.yellow : color.gray)
+    f_row(0, "SET DW Swing", syminfo.ticker, syminfo.ticker == "DELTA" ? color.lime : color.orange)
+    f_row(1, "ACTION", state, scol)
+    f_row(2, "Trend", trendUp ? "UP (>EMA>SMA)" : "not up", trendUp ? color.lime : color.gray)
+    f_row(3, "RSI 55-70", str.format("{0,number,#}", rsi), rsiOK ? color.lime : color.red)
+    f_row(4, "ADX >=25", str.format("{0,number,#}", adx), adxOK ? color.lime : color.red)
+    f_row(5, "Vol vs avg", str.format("{0,number,#.#}x", volume / volSma), volOK ? color.lime : color.red)
+    f_row(6, "Dist >EMA", str.format("{0,number,#.#}%", distPct), color.silver)
+    f_row(7, "Plan", buyRaw ? str.format("stop {0,number,#.##} T1 {1,number,#.##}", llStop, t1) : "-", color.silver)
+
+// ---- alert ------------------------------------------------------------------
+alertcondition(buy, title = "DELTA BUY(dip)", message = "DELTA BUY(dip) confirmed — see chart for stop/T1/T2")

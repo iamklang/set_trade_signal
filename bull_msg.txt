@@ -1,0 +1,17 @@
+SET Bull Scan (2026-07-07)
+
+ตลาด: 54/100 ขาขึ้น (บูลกว้าง)
+trigger: brk 4  rcl 1  gld 1
+
+★ Q1 leader + trigger (2):
+Ticker  sig          Buy     Stop       T1     Size
+---------------------------------------------------
+TOP     brk        52.25    44.25    60.25    1,875
+SPRC    brk         8.05     7.00     9.10   14,284
+
+Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
+
+วิเคราะห์:
+- overbought RSI≥78: TOP
+
+★=Q1 leader  *=ยืด >10% เหนือ EMA

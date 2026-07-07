@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# scan — run the SET DW Swing BUY(dip) scanner from anywhere.
+# Handles cd into the project, picks the right venv python, and recreates the
+# venv if /tmp wiped it. All args pass straight through to scan_dip.py.
+#
+#   ./scan                       # SET100, today, 1% risk
+#   ./scan --asof 2026-06-24     # spot-check a date
+#   ./scan --equity 500000 --risk 1.5 --sort dist
+#   ./scan --help                # full options
+set -euo pipefail
+
+PROJ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Persistent venv (NOT /tmp — macOS periodically wipes /tmp, which corrupted it before).
+VENV="$HOME/.venvs/trading-dr"
+PY="$VENV/bin/python"
+
+# Self-heal: recreate the venv if /tmp got cleared or partially wiped (reboot,
+# /tmp cleanup removing pyvenv.cfg / package files). Check an actual import, not
+# just that bin/python exists — a half-wiped venv keeps the symlink but breaks.
+if [ ! -x "$PY" ] || ! "$PY" -c "import pandas, playwright" >/dev/null 2>&1; then
+  echo "venv missing/broken at $VENV — (re)creating it (one-time, ~1–2 min)…" >&2
+  rm -rf "$VENV"
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q --upgrade pip
+  "$VENV/bin/pip" install -q yfinance pandas numpy exchange-calendars playwright
+  "$PY" -m playwright install chromium >&2
+fi
+
+cd "$PROJ"
+exec "$PY" scan_dip.py "$@"

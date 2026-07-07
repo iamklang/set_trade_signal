@@ -1,0 +1,11 @@
+__pycache__/
+.pytest_cache/
+.DS_Store
+
+# regenerable price cache (yfinance)
+data/*.csv
+
+# runtime logs
+logs/
+*.log
+*.out

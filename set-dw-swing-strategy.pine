@@ -1,0 +1,191 @@
+//@version=6
+// ============================================================================
+//  SET DW Swing — STRATEGY (backtest)
+//  Backtestable version of the `set-dw-swing` skill: enters the dip-to-EMA setup,
+//  sizes by fixed-fractional risk, exits on a structural stop and R-multiple
+//  targets (scale-out), with an optional trend-break exit.
+//
+//  Maps to the skill:
+//    §2 trend ....... 20-EMA filter (+ optional 200-SMA stacking)
+//    §5 entry ....... dip to EMA + green confirmation candle
+//    §7 risk ........ structural swing-low stop, fixed-fractional sizing, 1R/2R scale-out
+//    §4 exits ....... trend-break (close < EMA) flatten option
+//
+//  Run on a SET *stock* chart (Daily) to backtest the underlying method; a DW
+//  itself is too short-lived / illiquid to backtest meaningfully.
+//
+//  ⚠️ Backtest caveats (consistent with the skill's evidence section):
+//    - Macro / sector / earnings JUDGMENT is NOT modeled — this tests only the
+//      chart+risk mechanics. Real edge needs the §1–§4b context.
+//    - Earnings IV-crush avoidance needs FORWARD earnings dates = lookahead bias,
+//      so it is deliberately NOT in the entry logic. Earnings bars are only marked.
+//    - DW leverage is NOT simulated (would need IV/theta path). Returns here are
+//      the UNDERLYING's; a DW amplifies by ~effective gearing both ways.
+//    - Set realistic commission + slippage below. NOT financial advice.
+// ============================================================================
+strategy("SET DW Swing Strategy", shorttitle="SET-DW-S", overlay=true,
+     initial_capital=1000000, currency=currency.NONE,
+     default_qty_type=strategy.fixed, pyramiding=0,
+     commission_type=strategy.commission.percent, commission_value=0.157,
+     slippage=2, calc_on_every_tick=false, process_orders_on_close=true,
+     max_lines_count=200, max_labels_count=500)
+
+// ---------------------------------------------------------------------------
+// Inputs
+// ---------------------------------------------------------------------------
+grpT = "Trend (§2)"
+emaLen   = input.int(20,  "Orange EMA length", minval=2, group=grpT)
+smaLen   = input.int(200, "Structural SMA (200-day)", minval=2, group=grpT)
+reqStack = input.bool(true, "Require EMA > 200-SMA for longs", group=grpT)
+
+grpE = "Entry — dip to EMA (§5)"
+emaProx  = input.float(1.5, "Pullback proximity to EMA (%)", minval=0.1, step=0.1, group=grpE)
+lookback = input.int(5,   "Pullback lookback (bars)", minval=1, group=grpE)
+needGreen= input.bool(true, "Require green confirmation candle", group=grpE)
+cooldown = input.int(5,   "Cooldown after entry (bars)", minval=1, group=grpE, tooltip="Minimum bars between entries — prevents repeated trades off the same dip.")
+needHealthyVol = input.bool(false, "Require declining volume into pullback", group=grpE)
+// Win-rate filters (10y/25-name backtest: win% ~49→61% at PF 1.1)
+useRSI   = input.bool(true, "Momentum filter: RSI(14) ≥ threshold", group=grpE)
+rsiMin   = input.int(55, "RSI minimum", minval=1, maxval=99, group=grpE)
+reqSmaUp = input.bool(true, "Require 200-SMA rising", group=grpE)
+// Accuracy add-ons (validated OOS on DELTA/RCL/HANA)
+useADX   = input.bool(true, "Trend-strength: ADX(14) ≥ threshold", group=grpE, tooltip="Robust universal accuracy booster — rescued HANA OOS 45→58%.")
+adxMin   = input.int(20, "ADX minimum", minval=5, maxval=60, group=grpE)
+needRedPrior = input.bool(false, "Require prior bar red (true dip)", group=grpE, tooltip="Strong for clean trenders (DELTA 87% OOS); OFF for gap-up names (RCL).")
+needVolConf  = input.bool(true, "Require volume > average", group=grpE, tooltip="Demand confirmation — buy only on above-average volume. Default ON: 25-name/10y backtest nudges PF 1.10→1.13 and lowers drawdown without hurting win%. Turn OFF for thin names.")
+maxExt   = input.float(0.0, "Skip if > X% above EMA (0=off)", minval=0.0, step=0.5, group=grpE, tooltip="Caps how far above the EMA an entry may fire. Default OFF: a 25-name/10y backtest showed capping (3–6%) LOWERS PF & win% (trims the strong-momentum bounces). Turn ON only for gap-prone names where a far-above-EMA 'dip' is really a chase.")
+
+grpR = "Risk & sizing (§7)"
+sizeMode = input.string("Fixed units", "Sizing mode", options=["Fixed units", "Risk %"], group=grpR, tooltip="'Fixed units' = same quantity every trade (simple). 'Risk %' = size off the stop distance.")
+fixedQty = input.float(1000, "Fixed size (units)", minval=1, group=grpR)
+riskPct  = input.float(1.0, "Risk per trade (% of equity)", minval=0.1, maxval=5, step=0.1, group=grpR)
+stopLook = input.int(10,  "Structural-stop swing-low lookback", minval=2, group=grpR)
+stopBuf  = input.float(0.0, "Extra stop buffer (%)", minval=0.0, step=0.1, group=grpR, tooltip="Place the stop this % below the swing low.")
+rr1      = input.float(1.0, "Target 1 (R)", minval=0.5, step=0.5, group=grpR, tooltip="Closer targets = higher win rate. Backtest sweet spot 1R/1.5R.")
+rr2      = input.float(1.5, "Target 2 (R)", minval=0.5, step=0.5, group=grpR)
+scaleOut = input.bool(true, "Scale out 50% at T1, rest at T2", group=grpR)
+beAfterT1= input.bool(true, "Move stop to breakeven after T1", group=grpR, tooltip="Locks the remainder once T1 hits — raises win rate, caps give-back.")
+trendExit= input.bool(false, "Exit if close < EMA (trend break)", group=grpR, tooltip="OFF by default: a 10y/25-name SET backtest showed this EMA-cross exit causes whipsaw losses (PF 0.80 on vs 1.09 off). Let the structural stop + targets work instead.")
+maxBars  = input.int(0,   "Time stop (bars, 0=off)", minval=0, group=grpR)
+
+grpX = "Earnings (marker only)"
+markErn  = input.bool(true, "Mark past earnings bars", group=grpX)
+
+// ---------------------------------------------------------------------------
+// §2 Trend filter
+// ---------------------------------------------------------------------------
+ema   = ta.ema(close, emaLen)
+sma   = ta.sma(close, smaLen)
+emaUp = ema >= ema[1]
+smaUp = sma >= sma[5]
+rsi   = ta.rsi(close, 14)
+[_diP, _diM, adx] = ta.dmi(14, 14)
+trendUp = close > ema and emaUp and (not reqStack or ema > sma) and (not reqSmaUp or smaUp)
+
+plot(ema, "Orange EMA", color=color.new(color.orange,0), linewidth=2)
+plot(sma, "200-SMA",    color=color.new(color.gray,0))
+
+// ---------------------------------------------------------------------------
+// §5 Entry condition
+// ---------------------------------------------------------------------------
+volSma       = ta.sma(volume, 20)
+healthyPB    = volume < volSma
+pulledBack   = ta.lowest(low, lookback) <= ema * (1 + emaProx/100)
+freshDip     = pulledBack and low[1] <= ema[1] * (1 + emaProx/100)
+greenConfirm = close > open and close >= high[1]
+momentumOk   = not useRSI or rsi >= rsiMin
+adxOk        = not useADX or adx >= adxMin
+redPriorOk   = not needRedPrior or close[1] < open[1]
+volConfOk    = not needVolConf or volume > volSma
+notExtended  = maxExt <= 0 or close <= ema * (1 + maxExt/100)
+var int lastEntryBar = 0
+cooldownOk   = bar_index - lastEntryBar >= cooldown
+dipBuy = trendUp and freshDip and (not needGreen or greenConfirm) and (not needHealthyVol or healthyPB) and momentumOk and adxOk and redPriorOk and volConfOk and notExtended and cooldownOk
+
+// ---------------------------------------------------------------------------
+// §7 Stop / targets / fixed-fractional size (computed at the signal bar)
+// ---------------------------------------------------------------------------
+rawStop  = ta.lowest(low, stopLook)
+stopCalc = rawStop * (1 - stopBuf/100)
+riskU    = close - stopCalc
+riskSize = riskU > 0 ? math.floor((strategy.equity * riskPct/100) / riskU) : 0
+sizeCalc = sizeMode == "Fixed units" ? fixedQty : riskSize
+
+// Persist the entry plan across the life of the trade
+var float pStop  = na
+var float pT1    = na
+var float pT2    = na
+var float pEntry = na
+var int   pBar   = na
+var bool  pT1hit = false
+
+canEnter = dipBuy and strategy.position_size == 0 and sizeCalc > 0 and riskU > 0
+
+if canEnter
+    pStop  := stopCalc
+    pEntry := close
+    pT1    := close + rr1 * riskU
+    pT2    := close + rr2 * riskU
+    pBar   := bar_index
+    pT1hit := false
+    lastEntryBar := bar_index
+    strategy.entry("Long", strategy.long, qty=sizeCalc)
+
+// ---------------------------------------------------------------------------
+// §4/§7 Exits
+// ---------------------------------------------------------------------------
+if strategy.position_size > 0
+    // Place exits FIRST so the 50% T1 partial is still live on the very bar T1 is
+    // touched. (Previously the breakeven block flipped pT1hit before this, so the
+    // `if not pT1hit` T1 order was cancelled on the same bar it should have filled.)
+    if scaleOut
+        if not pT1hit
+            strategy.exit("T1", from_entry="Long", stop=pStop, limit=pT1, qty_percent=50)
+        strategy.exit("T2", from_entry="Long", stop=pStop, limit=pT2)
+    else
+        strategy.exit("Exit", from_entry="Long", stop=pStop, limit=pT2)
+    // THEN flag T1 reached and lift the stop to breakeven for the FOLLOWING bars.
+    if beAfterT1 and not pT1hit and high >= pT1
+        pT1hit := true
+        pStop := math.max(pStop, pEntry)
+    // Trend-break flatten (overrides remaining targets)
+    if trendExit and close < ema
+        strategy.close("Long", comment="trend break")
+    // Time stop
+    if maxBars > 0 and not na(pBar) and (bar_index - pBar) >= maxBars
+        strategy.close("Long", comment="time stop")
+
+// ---------------------------------------------------------------------------
+// Visuals — clear BUY / SELL labels (same look as the indicator)
+// ---------------------------------------------------------------------------
+showLabels = input.bool(true, "Big BUY / SELL labels with prices", group="Display")
+colorBars  = input.bool(true, "Color candles by trend (green/red)", group="Display")
+trendDn = close < ema
+
+f_pr(x) => str.tostring(x, format.mintick)
+
+// Detect a fill / exit by watching position-size changes
+justEntered = strategy.position_size > 0 and strategy.position_size[1] == 0
+justExited  = strategy.position_size == 0 and strategy.position_size[1] > 0
+
+barcolor(colorBars ? (trendUp ? color.new(color.green,30) : trendDn ? color.new(color.red,40) : na) : na)
+
+if showLabels and justEntered
+    label.new(bar_index, low, "BUY\nEntry " + f_pr(strategy.position_avg_price) + "\nStop " + f_pr(pStop) + "\nTP " + f_pr(pT1),
+         yloc=yloc.belowbar, color=color.new(color.green,0), textcolor=color.white, style=label.style_label_up, size=size.normal)
+if showLabels and justExited
+    label.new(bar_index, high, "SELL\n" + f_pr(close),
+         yloc=yloc.abovebar, color=color.new(color.red,0), textcolor=color.white, style=label.style_label_down, size=size.normal)
+
+// Triangle backups (always visible)
+plotshape(canEnter, "BUY", shape.triangleup, location.belowbar, color.new(color.green,0), size=size.small)
+plotshape(justExited, "SELL", shape.triangledown, location.abovebar, color.new(color.red,0), size=size.small)
+
+// Open-trade rails
+inTrade = strategy.position_size > 0
+plot(inTrade ? pStop : na, "Stop",  color=color.new(color.red,0),   style=plot.style_linebr, linewidth=2)
+plot(inTrade ? pT1   : na, "T1",    color=color.new(color.green,0), style=plot.style_linebr, linewidth=2)
+plot(inTrade ? pT2   : na, "T2",    color=color.new(color.green,40),style=plot.style_linebr)
+
+ernActual = request.earnings(syminfo.tickerid, earnings.actual, ignore_invalid_symbol=true)
+plotshape(markErn and not na(ernActual) and (na(ernActual[1]) or ernActual != ernActual[1]), "Earnings", shape.diamond, location.belowbar, color.new(color.purple,0), size=size.tiny)

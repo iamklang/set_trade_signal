@@ -1,0 +1,338 @@
+//@version=6
+// ============================================================================
+//  SET DW Swing — Trend / Dip / Risk dashboard
+//  Encodes the `set-dw-swing` skill (DW Trader method + verified research).
+//  Indicator (overlay) so it works on any SET stock or its DW chart.
+//
+//  Maps to the skill:
+//    §2 index regime ....... 20-EMA "orange line" trend filter (+200 SMA backstop)
+//    §4 chart plan ......... pivots = support/resistance, gaps, 200-day
+//    §4b earnings .......... IV-crush proximity warning + past-earnings markers
+//    §5 entry rules ........ dip-to-EMA + green confirmation candle
+//    §4 volume reads ....... healthy pullback / accumulation / Selling-Climax
+//    §6 DW selection ....... effective gearing = gearing x delta, delta band check
+//    §7 risk & exits ....... structural stop, 1R/2R/3R, fixed-fractional sizing
+//
+//  NOT financial advice. Signals are mechanical aids — verify against the skill's
+//  macro/sector/earnings context before acting. Levels/IV must be checked live.
+// ============================================================================
+indicator("SET DW Swing", shorttitle="SET-DW", overlay=true, max_labels_count=500, max_lines_count=100)
+
+// ---------------------------------------------------------------------------
+// Inputs
+// ---------------------------------------------------------------------------
+grpT = "Trend (§2)"
+emaLen   = input.int(20,  "Orange EMA length", minval=2, group=grpT, tooltip="The 'เส้นส้ม' trend filter. 20 per the method.")
+smaLen   = input.int(200, "Structural SMA (200-day)", minval=2, group=grpT)
+reqStack = input.bool(true, "Require EMA > 200-SMA for longs", group=grpT, tooltip="Only flag dip-buys when the broader trend is up too.")
+
+grpE = "Entry — dip to EMA (§5)"
+emaProx  = input.float(1.5, "Pullback proximity to EMA (%)", minval=0.1, step=0.1, group=grpE, tooltip="How close a recent low must come to the EMA to count as a dip.")
+lookback = input.int(5,   "Pullback lookback (bars)", minval=1, group=grpE)
+needGreen= input.bool(true, "Require green confirmation candle", group=grpE, tooltip="close>open AND close>=prior high — don't buy before the bounce confirms.")
+cooldown = input.int(5,   "Cooldown after BUY (bars)", minval=1, group=grpE, tooltip="Minimum bars between two BUY signals — prevents repeated entries off the same dip.")
+// --- Win-rate filters (from 10y/25-name backtest: raised win% ~49→61% at PF 1.1) ---
+useRSI   = input.bool(true, "Momentum filter: RSI ≥ threshold", group=grpE, tooltip="Only buy dips that still have momentum. Backtest: lifts win rate without killing expectancy.")
+rsiMin   = input.int(55, "RSI(14) minimum", minval=1, maxval=99, group=grpE)
+reqSmaUp = input.bool(true, "Require 200-SMA rising", group=grpE, tooltip="Only trade healthy, established uptrends.")
+maxExt   = input.float(0.0, "Skip if > X% above EMA (0=off)", minval=0.0, step=0.5, group=grpE, tooltip="Caps how far above the orange line a BUY may fire. Default OFF: a 25-name/10y SET backtest showed capping (3–6%) LOWERS PF & win% — it trims the strong-momentum bounces that are the good dip-buys. Turn ON only discretionarily for gap-prone names (e.g. RCL) where a far-above-EMA 'dip' is really a chase.")
+// --- Accuracy add-ons (validated out-of-sample on DELTA/RCL/HANA) ---
+useADX   = input.bool(true, "Trend-strength: ADX ≥ threshold", group=grpE, tooltip="Most robust universal accuracy booster — only trade when a real trend exists. Rescued the weakest name (HANA) OOS 45→58%.")
+adxMin   = input.int(20, "ADX(14) minimum", minval=5, maxval=60, group=grpE)
+needRedPrior = input.bool(false, "Require prior bar red (buy a true dip)", group=grpE, tooltip="Strong for clean trenders (DELTA → 87% OOS). Turn OFF for gap-up names like RCL.")
+needVolConf  = input.bool(true, "Require volume > average", group=grpE, tooltip="Demand confirmation — buy the bounce only on above-average volume. Default ON: a 25-name/10y backtest showed it nudges PF 1.10→1.13 and lowers drawdown without hurting win%. Turn OFF for thin names where volume is noisy.")
+
+grpV = "Volume reads (§4)"
+volLen   = input.int(20,  "Volume average length", minval=2, group=grpV)
+spikeMult= input.float(2.0, "Volume-spike multiple", minval=1.0, step=0.1, group=grpV)
+atrLen   = input.int(14,  "ATR length (range gauge)", minval=2, group=grpV)
+climRng  = input.float(1.5, "Selling-Climax range x ATR", minval=0.5, step=0.1, group=grpV)
+
+grpP = "Structure (§4)"
+pivLen   = input.int(10,  "Pivot left/right (S/R)", minval=2, group=grpP)
+
+grpR = "Risk & sizing (§7)"
+equity   = input.float(1000000, "Account equity (THB)", minval=0, group=grpR)
+riskPct  = input.float(1.0, "Risk per trade (%)", minval=0.1, maxval=5, step=0.1, group=grpR, tooltip="Fixed-fractional: 1% default, 2% max. Sized off the structural stop.")
+stopLook = input.int(10,  "Structural-stop swing-low lookback", minval=2, group=grpR)
+rr1      = input.float(1.0, "Target 1 (R multiple)", minval=0.5, step=0.5, group=grpR, tooltip="Closer targets hit more often → higher win rate. Backtest sweet spot 1R/1.5R.")
+rr2      = input.float(1.5, "Target 2 (R multiple)", minval=0.5, step=0.5, group=grpR)
+
+grpD = "DW check (§6) — fill from the warrant card"
+useDW    = input.bool(false, "This is a DW (show gearing/IV check)", group=grpD)
+dwGear   = input.float(4.5, "Simple gearing (x)", minval=0.1, step=0.1, group=grpD)
+dwDelta  = input.float(0.6, "Delta / sensitivity (0-1)", minval=0.0, maxval=1.0, step=0.01, group=grpD)
+
+grpX = "Earnings / IV crush (§4b)"
+nextErn  = input.time(0, "Next earnings date (manual)", group=grpX, tooltip="Pine has no reliable upcoming-earnings feed — set it from the broker calendar. 0 = off.")
+warnDays = input.int(5, "IV-crush warning window (days)", minval=1, group=grpX)
+markErn  = input.bool(true, "Mark past earnings bars", group=grpX)
+
+grpDisp = "Display"
+simpleMode = input.bool(true,  "Simple mode (show only BUY / SELL)", group=grpDisp, tooltip="Hide the advanced markers (accumulation, fake breakout, past earnings) for a clean BUY/SELL view.")
+showLabels = input.bool(true,  "Big BUY / SELL labels with prices", group=grpDisp)
+colorBars  = input.bool(true,  "Color candles by trend (green/red)", group=grpDisp)
+showRails  = input.bool(true,  "Show stop / target lines on BUY", group=grpDisp)
+
+// ---------------------------------------------------------------------------
+// §2 Trend filter — the orange EMA + 200-day backstop
+// ---------------------------------------------------------------------------
+ema   = ta.ema(close, emaLen)
+sma   = ta.sma(close, smaLen)
+emaUp = ema >= ema[1]
+smaUp = sma >= sma[5]
+rsi   = ta.rsi(close, 14)
+[_diP, _diM, adx] = ta.dmi(14, 14)
+trendUp = close > ema and emaUp and (not reqStack or ema > sma) and (not reqSmaUp or smaUp)
+trendDn = close < ema
+
+plot(ema, "Orange EMA", color=color.new(color.orange, 0), linewidth=2)
+plot(sma, "200-SMA", color=color.new(color.gray, 0), linewidth=1)
+bgcolor(trendUp ? color.new(color.green, 92) : trendDn ? color.new(color.red, 94) : na, title="Trend tint")
+
+// ---------------------------------------------------------------------------
+// §4 Volume reads
+// ---------------------------------------------------------------------------
+volSma  = ta.sma(volume, volLen)
+atr     = ta.atr(atrLen)
+rng     = high - low
+downBar = close < open
+spike   = volume > volSma * spikeMult
+
+// Accumulation: heavy sell volume that fails to push price down (close holds upper half / above prior close)
+accumulation = spike and close >= close[1] and close >= low + rng * 0.5
+
+// Selling-Climax: big down range + volume spike + close in lower half, after weakness (§4b miss-dump)
+priorWeak    = close < ta.highest(close, volLen)[1] * 0.95 or trendDn
+sellingClimax = downBar and rng > atr * climRng and spike and close < (high + low) / 2 and priorWeak
+
+// ---------------------------------------------------------------------------
+// §4 Structure — pivots (S/R), 200-day already plotted, gaps
+// ---------------------------------------------------------------------------
+ph = ta.pivothigh(high, pivLen, pivLen)
+pl = ta.pivotlow(low,  pivLen, pivLen)
+var float lastRes = na
+var float lastSup = na
+if not na(ph)
+    lastRes := ph
+if not na(pl)
+    lastSup := pl
+plot(lastRes, "Resistance", color=color.new(color.red,40),  style=plot.style_circles, linewidth=1)
+plot(lastSup, "Support",    color=color.new(color.teal,40), style=plot.style_circles, linewidth=1)
+
+// Fake breakout (§4): poke above last resistance but close back under, red bar
+fakeBreak = not na(lastRes) and high > lastRes and close < lastRes and downBar
+
+// ---------------------------------------------------------------------------
+// §5 Entry — dip to EMA with green confirmation
+// ---------------------------------------------------------------------------
+pulledBack   = ta.lowest(low, lookback) <= ema * (1 + emaProx/100)
+freshDip     = pulledBack and low[1] <= ema[1] * (1 + emaProx/100)
+greenConfirm = close > open and close >= high[1]
+momentumOk   = not useRSI or rsi >= rsiMin
+notExtended  = maxExt <= 0 or close <= ema * (1 + maxExt/100)
+adxOk        = not useADX or adx >= adxMin
+redPriorOk   = not needRedPrior or close[1] < open[1]
+volConfOk    = not needVolConf or volume > volSma
+var int lastBuyBar = 0
+cooldownOk   = bar_index - lastBuyBar >= cooldown
+rawDipBuy    = trendUp and freshDip and (not needGreen or greenConfirm) and momentumOk and notExtended and adxOk and redPriorOk and volConfOk and cooldownOk
+dipBuy       = rawDipBuy
+if dipBuy and barstate.isconfirmed
+    lastBuyBar := bar_index
+
+// ---------------------------------------------------------------------------
+// §7 Risk — structural stop, R multiples, fixed-fractional size
+// ---------------------------------------------------------------------------
+stopLevel = ta.lowest(low, stopLook)
+riskPerU  = close - stopLevel
+oneR      = riskPerU
+tgt1      = close + rr1 * oneR
+tgt2      = close + rr2 * oneR
+riskAmt   = equity * riskPct / 100
+posSize   = riskPerU > 0 ? math.floor(riskAmt / riskPerU) : 0
+
+// ---------------------------------------------------------------------------
+// §6 DW effective gearing / delta band
+// ---------------------------------------------------------------------------
+effGear   = dwGear * dwDelta
+deltaWarn = useDW and (dwDelta > 0.80 or dwDelta < 0.20)
+
+// ---------------------------------------------------------------------------
+// §4b Earnings — IV-crush proximity + past-earnings markers
+// ---------------------------------------------------------------------------
+daysToErn = nextErn > 0 ? (nextErn - time) / 86400000.0 : na
+ivCrush   = not na(daysToErn) and daysToErn >= 0 and daysToErn <= warnDays
+ernActual = request.earnings(syminfo.tickerid, earnings.actual, ignore_invalid_symbol=true)
+isErnBar  = markErn and not na(ernActual) and (na(ernActual[1]) or ernActual != ernActual[1])
+plotshape(isErnBar, "Earnings (past)", shape.diamond, location.belowbar, color.new(color.purple,0), size=size.tiny)
+
+// Price formatter (defined before first use)
+f_pr(x) => str.tostring(x, format.mintick)
+
+// ---------------------------------------------------------------------------
+// BUY / SELL signals  (the headline, user-facing output)
+//   BUY  = dip-to-EMA setup confirmed (§5)
+//   SELL = exit a long: trend breaks below EMA, OR rejection at resistance (§4/§7)
+//   SELL only fires after a BUY (tracks whether we're "in" a simulated position)
+// ---------------------------------------------------------------------------
+buySignal  = dipBuy
+
+// --- Track simulated position so SELL only fires when relevant ---
+var bool inPos       = false
+var int  lastSellBar = 0
+if buySignal and barstate.isconfirmed
+    inPos := true
+
+trendBreak = inPos and ta.crossunder(close, ema)
+resReject  = inPos and not na(lastRes) and high >= lastRes and close < open and close < lastRes and (bar_index - lastSellBar >= cooldown)
+sellSignal = trendBreak or resReject
+sellReason = trendBreak ? "trend break" : "resistance"
+
+if sellSignal and barstate.isconfirmed
+    inPos       := false
+    lastSellBar := bar_index
+
+// Candle coloring — instant read of the regime
+barcolor(colorBars ? (trendUp ? color.new(color.green,30) : trendDn ? color.new(color.red,40) : na) : na)
+
+// --- Big, plain-language labels ---
+if showLabels and buySignal and barstate.isconfirmed
+    txt = ivCrush ? "BUY (dip)\n⚠ earnings near" : "BUY (dip)"
+    label.new(bar_index, low, txt + "\nEntry " + f_pr(close) + "\nStop " + f_pr(stopLevel) + "\nTP " + f_pr(tgt1),
+         yloc=yloc.belowbar, color=ivCrush ? color.new(color.orange,0) : color.new(color.green,0),
+         textcolor=color.white, style=label.style_label_up, size=size.normal)
+if showLabels and sellSignal and barstate.isconfirmed
+    label.new(bar_index, high, "SELL\n(" + sellReason + ")\n" + f_pr(close),
+         yloc=yloc.abovebar, color=color.new(color.red,0), textcolor=color.white,
+         style=label.style_label_down, size=size.normal)
+
+// Simple triangle backups (always on, even if labels are off).
+// Gated by barstate.isconfirmed so the live (forming) bar can't paint then erase
+// a BUY/SELL — historical bars are unaffected (isconfirmed is always true there).
+plotshape(buySignal  and barstate.isconfirmed, "BUY", shape.triangleup,   location.belowbar, color.new(color.green,0), size=size.small)
+plotshape(sellSignal and barstate.isconfirmed, "SELL",shape.triangledown, location.abovebar, color.new(color.red,0),   size=size.small)
+
+// --- Advanced markers (hidden in simple mode) ---
+plotshape(not simpleMode and sellingClimax, "Selling Climax", shape.labeldown, location.abovebar, color.new(color.maroon,0), text="SC", textcolor=color.white, size=size.tiny)
+plotshape(not simpleMode and accumulation,  "Accumulation",   shape.circle,    location.belowbar, color.new(color.blue,0),  size=size.tiny)
+plotshape(not simpleMode and fakeBreak,      "Fake breakout",  shape.xcross,    location.abovebar, color.new(color.red,0),   size=size.tiny)
+
+// Stop / target rails drawn on the latest BUY
+var line lnStop = na
+var line lnT1 = na
+var line lnT2 = na
+if showRails and buySignal and barstate.isconfirmed
+    line.delete(lnStop)
+    line.delete(lnT1)
+    line.delete(lnT2)
+    lnStop := line.new(bar_index, stopLevel, bar_index+10, stopLevel, color=color.new(color.red,0),   width=2, style=line.style_dashed)
+    lnT1   := line.new(bar_index, tgt1,      bar_index+10, tgt1,      color=color.new(color.green,0),  width=2, style=line.style_dotted)
+    lnT2   := line.new(bar_index, tgt2,      bar_index+10, tgt2,      color=color.new(color.green,40), width=1, style=line.style_dotted)
+
+// ---------------------------------------------------------------------------
+// Win-rate tracker — replays each BUY vs its stop & first target (1R) over the
+// visible history and tallies the result. "Win" = first target reached before
+// the stop (stop-first if both hit the same bar). A simulation, not live P&L.
+// ---------------------------------------------------------------------------
+var int   wrWins = 0
+var int   wrLoss = 0
+var float wrRsum = 0.0          // sum of R outcomes: +rr1 per win, −1 per stop
+var bool  wrIn   = false
+var float wrStop = na
+var float wrTgt  = na
+var float wrTgtR = na           // the win's R value captured at entry (= rr1)
+if barstate.isconfirmed
+    if wrIn
+        if low <= wrStop
+            wrLoss := wrLoss + 1
+            wrRsum := wrRsum - 1.0
+            wrIn := false
+        else if high >= wrTgt
+            wrWins := wrWins + 1
+            wrRsum := wrRsum + wrTgtR
+            wrIn := false
+    if not wrIn and buySignal and not na(stopLevel) and (close - stopLevel) > 0
+        wrIn := true
+        wrStop := stopLevel
+        wrTgt := tgt1
+        wrTgtR := rr1
+wrTot  = wrWins + wrLoss
+winRate = wrTot > 0 ? 100.0 * wrWins / wrTot : na
+avgR    = wrTot > 0 ? wrRsum / wrTot : na          // expectancy per trade, in R
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+distPct = (close - ema) / ema * 100
+
+var table dash = table.new(position.top_right, 2, 15, border_width=1)
+if barstate.islast
+    trendTxt = trendUp ? "UP (buy dips)" : trendDn ? "DOWN (bounce only)" : "flat"
+    trendCol = trendUp ? color.green : trendDn ? color.red : color.gray
+    setupTxt = dipBuy ? "DIP-BUY" : sellingClimax ? "Selling-Climax" : accumulation ? "Accumulation" : fakeBreak ? "Fake breakout — avoid" : "—"
+
+    // Plain-language ACTION banner — the one thing a user reads first
+    actionTxt = buySignal ? (ivCrush ? "⚠ BUY — earnings near" : "🟢 BUY (dip)") : sellSignal ? "🔴 SELL (" + sellReason + ")" : trendUp ? "HOLD / wait for dip" : "⚪ STAND ASIDE"
+    actionCol = buySignal ? (ivCrush ? color.orange : color.green) : sellSignal ? color.red : trendUp ? color.teal : color.gray
+
+    table.cell(dash, 0, 0, "SET DW Swing", text_color=color.white, bgcolor=color.new(color.blue,0), text_size=size.small)
+    table.cell(dash, 1, 0, syminfo.ticker, text_color=color.white, bgcolor=color.new(color.blue,0), text_size=size.small)
+
+    table.cell(dash, 0, 1, "ACTION", text_color=color.white, bgcolor=color.new(color.black,0), text_size=size.normal)
+    table.cell(dash, 1, 1, actionTxt, text_color=color.white, bgcolor=color.new(actionCol,0), text_size=size.normal)
+
+    table.cell(dash, 0, 2, "Trend", text_size=size.small)
+    table.cell(dash, 1, 2, trendTxt, text_color=color.white, bgcolor=color.new(trendCol,20), text_size=size.small)
+
+    table.cell(dash, 0, 3, "Px vs EMA", text_size=size.small)
+    table.cell(dash, 1, 3, str.tostring(distPct, "#.##") + "%", text_size=size.small)
+
+    table.cell(dash, 0, 4, "EMA / 200", text_size=size.small)
+    table.cell(dash, 1, 4, f_pr(ema) + " / " + f_pr(sma), text_size=size.small)
+
+    table.cell(dash, 0, 5, "Support / Res", text_size=size.small)
+    table.cell(dash, 1, 5, (na(lastSup)?"—":f_pr(lastSup)) + " / " + (na(lastRes)?"—":f_pr(lastRes)), text_size=size.small)
+
+    table.cell(dash, 0, 6, "Setup", text_size=size.small)
+    table.cell(dash, 1, 6, setupTxt, text_color=color.white, bgcolor=color.new(dipBuy?color.green:color.gray,20), text_size=size.small)
+
+    table.cell(dash, 0, 7, "Buy / Stop", text_size=size.small)
+    table.cell(dash, 1, 7, f_pr(close) + " / " + f_pr(stopLevel), text_size=size.small)
+
+    table.cell(dash, 0, 8, str.tostring(rr1,"#.#")+"R / "+str.tostring(rr2,"#.#")+"R TP", text_size=size.small)
+    table.cell(dash, 1, 8, f_pr(tgt1) + " / " + f_pr(tgt2), text_size=size.small)
+
+    table.cell(dash, 0, 9, "Size @ "+str.tostring(riskPct,"#.#")+"%", text_size=size.small)
+    table.cell(dash, 1, 9, str.tostring(posSize) + " units", text_size=size.small)
+
+    dwTxt = useDW ? "effG " + str.tostring(effGear,"#.#") + "x  (Δ" + str.tostring(dwDelta,"#.##") + ")" : "n/a"
+    table.cell(dash, 0, 10, "DW gearing", text_size=size.small)
+    table.cell(dash, 1, 10, dwTxt, text_color=color.white, bgcolor=color.new(deltaWarn?color.orange:color.gray,20), text_size=size.small)
+
+    ernTxt = na(daysToErn) ? "—" : str.tostring(math.round(daysToErn)) + "d" + (ivCrush ? "  IV-CRUSH!" : "")
+    table.cell(dash, 0, 11, "Earnings", text_size=size.small)
+    table.cell(dash, 1, 11, ernTxt, text_color=color.white, bgcolor=color.new(ivCrush?color.red:color.gray,20), text_size=size.small)
+
+    wrTxt = na(winRate) ? "—" : str.tostring(winRate, "#.#") + "%  (" + str.tostring(wrWins) + "/" + str.tostring(wrTot) + ")"
+    wrCol = na(winRate) ? color.gray : winRate >= 50 ? color.green : winRate >= 40 ? color.orange : color.red
+    table.cell(dash, 0, 12, "Win rate (sim)", text_size=size.small)
+    table.cell(dash, 1, 12, wrTxt, text_color=color.white, bgcolor=color.new(wrCol,20), text_size=size.small)
+
+    erTxt = na(avgR) ? "—" : (avgR >= 0 ? "+" : "") + str.tostring(avgR, "#.##") + "R / trade"
+    erCol = na(avgR) ? color.gray : avgR > 0 ? color.green : color.red
+    table.cell(dash, 0, 13, "Expectancy", text_size=size.small)
+    table.cell(dash, 1, 13, erTxt, text_color=color.white, bgcolor=color.new(erCol,20), text_size=size.small)
+
+    note = deltaWarn ? "Δ outside 0.2–0.8: leverage/lottery" : ivCrush ? "Avoid pre-earnings DW (IV crush)" : avgR != 0 and not na(avgR) and avgR <= 0 ? "High win% but no edge — check R" : trendUp ? "Buy dips, sell into resistance" : "No long edge here"
+    table.cell(dash, 0, 14, "Note", text_size=size.small)
+    table.cell(dash, 1, 14, note, text_size=size.small)
+
+// ---------------------------------------------------------------------------
+// Alerts
+// ---------------------------------------------------------------------------
+alertcondition(buySignal  and barstate.isconfirmed, "BUY signal",  "SET-DW BUY on {{ticker}} at {{close}} — dip-to-EMA confirmed")
+alertcondition(sellSignal and barstate.isconfirmed, "SELL signal", "SET-DW SELL on {{ticker}} at {{close}} — exit long (trend break / resistance)")
+alertcondition(sellingClimax, "Selling Climax",    "SET-DW: Selling-Climax bar on {{ticker}} — watch for SC base")
+alertcondition(accumulation,  "Accumulation bar",  "SET-DW: high-volume bar holding on {{ticker}} — possible accumulation")
+alertcondition(ivCrush,       "Earnings IV-crush", "SET-DW: earnings within window on {{ticker}} — DW IV-crush risk")
