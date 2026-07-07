@@ -27,3 +27,11 @@ echo "--- 2/3 bull scan (writes bull_msg.txt; LINE folded into the 17:30 alert) 
 "$PY" scan_bull.py --no-line
 echo "--- 3/3 collect NVDR snapshot (builds foreign-flow history for a future weak signal) ---"
 "$PY" collect_nvdr.py || echo "  (NVDR collect failed — non-fatal, core pipeline unaffected)"
+echo "--- 4/4 git snapshot (daily signal history) ---"
+if git -C "$PROJ" add -A && ! git -C "$PROJ" diff --cached --quiet; then
+  git -C "$PROJ" commit -q -m "daily_scan $(date '+%Y-%m-%d %H:%M')" \
+    && echo "  committed daily snapshot" \
+    || echo "  (git commit failed — non-fatal)"
+else
+  echo "  no changes to commit"
+fi
