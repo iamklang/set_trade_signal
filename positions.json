@@ -1,1 +1,25 @@
-{}
+{
+  "PTTEP.BK": {
+    "adx": 27.0,
+    "cur": 141.5,
+    "entry_close": 141.5,
+    "entry_date": "2026-07-08",
+    "first_seen": "2026-07-08",
+    "flagged_date": null,
+    "init_stop": 129.0,
+    "last_seen": "2026-07-08",
+    "phase": "FULL",
+    "pl_pct": 0.0,
+    "quintile": 3,
+    "regime_mult": 1.0,
+    "rsi": 60.0,
+    "size": 800,
+    "size_mult": 1.0,
+    "state": "HOLDING",
+    "status": "HOLD",
+    "stop": 129.0,
+    "t1": 154.0,
+    "t1_date": null,
+    "t2": 160.25
+  }
+}

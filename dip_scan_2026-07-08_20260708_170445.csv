@@ -1,0 +1,2 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+PTTEP.BK,141.5,141.5,129.0,12.5,154.0,160.25,800,4.4598,59.6117,27.1126,-0.201,800,1.0,1.0,3,True,confirmed,2026-07-08 17:04
