@@ -1,0 +1,3 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+STECON.BK,18.3,18.3,17.4,0.9,19.2,19.65,16666,4.234,61.3692,40.0657,3.09,11111,1.5,1.0,1,True,confirmed,2026-07-09 17:03
+CK.BK,19.8,19.8,18.7,1.1,20.9,21.45,13635,2.6526,56.9909,21.928,0.636,9090,1.5,1.0,1,True,confirmed,2026-07-09 17:03
