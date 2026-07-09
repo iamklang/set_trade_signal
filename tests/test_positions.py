@@ -216,3 +216,52 @@ def test_save_load_roundtrip(tmp_path):
 
 def test_load_missing_file_returns_empty(tmp_path):
     assert pos.load(str(tmp_path / "nope.json")) == {}
+
+
+# ---- XD/split re-anchor (_rescale_levels) --------------------------------------------
+
+def _df_seq(closes, start="2026-06-01"):
+    idx = pd.date_range(start, periods=len(closes), freq="D")
+    return pd.DataFrame({"Open": closes, "High": closes, "Low": closes,
+                         "Close": closes, "Volume": [1_000_000] * len(closes)}, index=idx)
+
+
+def test_xd_adjustment_does_not_false_stop():
+    """A 3% dividend adjustment rescales Yahoo history; the stored stop must rescale too,
+    so a close above the ADJUSTED stop (but below the stale one) stays HOLDING."""
+    f1 = {"X.BK": _df_seq([10.0] * 30)}                      # last bar 2026-06-30
+    state, _ = pos.update({}, [_hit("X.BK")], f1, "2026-06-30")
+    assert state["X.BK"]["stop"] == 9.0
+    # XD: Yahoo scales all prior bars x0.97; new bar closes 8.9 (above 9.0*0.97=8.73)
+    f2 = {"X.BK": _df_seq([10.0 * 0.97] * 30 + [8.9])}
+    state, tr = pos.update(state, [], f2, "2026-07-01")
+    assert state["X.BK"]["state"] == "HOLDING"
+    assert not tr["sell_today"]
+    assert state["X.BK"]["entry_close"] == 9.7
+    assert state["X.BK"]["stop"] == 8.73
+    assert state["X.BK"]["t1"] == 10.67                      # 11.0 x 0.97
+    # idempotent: same scale next run -> no further drift
+    f3 = {"X.BK": _df_seq([10.0 * 0.97] * 30 + [8.9, 8.9])}
+    state, _ = pos.update(state, [], f3, "2026-07-02")
+    assert state["X.BK"]["stop"] == 8.73
+
+
+def test_xd_adjustment_run_phase_keeps_breakeven_equal_entry():
+    """After T1 the stop sits at entry (breakeven); rescaling must keep stop == entry."""
+    f1 = {"X.BK": _df_seq([10.0] * 30)}
+    state, _ = pos.update({}, [_hit("X.BK")], f1, "2026-06-30")
+    state, _ = pos.update(state, [], {"X.BK": _df_seq([10.0] * 30 + [11.0])}, "2026-07-01")
+    assert state["X.BK"]["phase"] == "RUN" and state["X.BK"]["stop"] == 10.0
+    f2 = {"X.BK": _df_seq([10.0 * 0.95] * 31 + [10.2])}      # 5% dividend, still above BE
+    state, tr = pos.update(state, [], f2, "2026-07-02")
+    assert state["X.BK"]["state"] == "HOLDING"
+    assert state["X.BK"]["stop"] == state["X.BK"]["entry_close"] == 9.5
+
+
+def test_small_drift_below_tolerance_untouched():
+    """Sub-tolerance drift (rounding noise) must not rescale anything."""
+    f1 = {"X.BK": _df_seq([10.0] * 30)}
+    state, _ = pos.update({}, [_hit("X.BK")], f1, "2026-06-30")
+    f2 = {"X.BK": _df_seq([10.001] * 30 + [9.8])}            # 0.01% << ADJ_TOL
+    state, _ = pos.update(state, [], f2, "2026-07-01")
+    assert state["X.BK"]["stop"] == 9.0 and state["X.BK"]["entry_close"] == 10.0

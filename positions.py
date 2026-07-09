@@ -97,6 +97,40 @@ def _latest(df):
     return close, ema
 
 
+# Re-anchor threshold: rescale stored levels when the entry bar's close in today's data has
+# drifted more than this (relative) from the recorded entry_close. 0.25% sits well below any
+# real SET dividend (~1-5%) but above float/rounding noise on 2dp prices.
+ADJ_TOL = 0.0025
+
+
+def _rescale_levels(rec, df):
+    """Yahoo frames are dividend/split-adjusted (auto_adjust=True): after an XD every bar
+    BEFORE the ex-date is scaled down retroactively, so price levels stored at entry sit on a
+    stale scale — the post-XD close can breach the stored stop by the dividend gap alone, a
+    false STOP the backtest (adjusted end-to-end) never sees. Re-anchor each run: compare
+    today's adjusted close ON THE ENTRY BAR to the stored entry_close; if drifted beyond
+    ADJ_TOL, scale every stored price level by that factor. Idempotent — entry_close is
+    rewritten too, so the next run's factor ≈ 1. A missing entry bar leaves levels untouched."""
+    entry, edate = rec.get("entry_close"), rec.get("entry_date")
+    if not entry or not edate or df is None or len(df) == 0:
+        return rec
+    try:
+        bar = df["Close"].loc[str(edate)]
+        adj = float(bar.iloc[-1]) if hasattr(bar, "iloc") else float(bar)
+    except (KeyError, TypeError, ValueError):
+        return rec
+    if not adj or adj <= 0:
+        return rec
+    factor = adj / float(entry)
+    if abs(factor - 1.0) <= ADJ_TOL:
+        return rec
+    for k in ("entry_close", "stop", "init_stop", "t1", "t2"):
+        v = rec.get(k)
+        if v is not None:
+            rec[k] = _r(float(v) * factor)
+    return rec
+
+
 def sell_note(reason):
     """Thai reason shown next to a fully-exited (SELL_FLAGGED) name."""
     return {
@@ -192,7 +226,9 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
         rec = positions[t]
         if rec.get("state") != HOLDING:
             continue
-        close, ema = _latest(frames.get(t))
+        df_t = frames.get(t)
+        _rescale_levels(rec, df_t)          # XD/split re-anchor BEFORE any stop/T1 comparison
+        close, ema = _latest(df_t)
         entry, phase = rec.get("entry_close"), rec.get("phase", FULL)
         rec["cur"] = _r(close)
         rec["pl_pct"] = (_r((close - entry) / entry * 100, 1)
