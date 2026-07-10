@@ -157,26 +157,39 @@ def main():
 
     asof = pd.Timestamp(requested_date)
 
-    hits, missing, asof_date = [], [], None
+    hits, missing, stale, asof_date = [], [], [], None
 
     def run_scan(fetch):
+        # Pass 1: slice every frame to <= asof and find the scan bar = the LATEST last-bar
+        # date across the universe. Names whose own last bar is older (halted / SP / Yahoo
+        # lag) are evaluated on a DIFFERENT day's bar — silently mixing dates made a stale
+        # name's day-old candle look like "today's signal". They are excluded from fresh
+        # BUY hits (reported as stale); the positions book still sees their frames.
+        nonlocal asof_date
+        sliced = {}
         for t in tickers:
+            df = fetch(t)
+            if df is None or len(df) < sig.SMA_LEN + 30:
+                missing.append((t, "insufficient history")); continue
+            if asof is not None:
+                df = df[df.index <= asof]
+                if len(df) < sig.SMA_LEN + 30:
+                    missing.append((t, "no data before asof")); continue
+            sliced[t] = df
+        if not sliced:
+            return
+        last_bar = {t: df.index[-1].date() for t, df in sliced.items()}
+        asof_date = max(last_bar.values())
+        # Pass 2: evaluate the signal only on names whose last bar IS the scan bar.
+        for t, df in sliced.items():
+            if last_bar[t] != asof_date:
+                stale.append((t, last_bar[t])); continue
             try:
-                df = fetch(t)
-                if df is None or len(df) < sig.SMA_LEN + 30:
-                    missing.append((t, "insufficient history")); continue
-                if asof is not None:
-                    df = df[df.index <= asof]
-                    if len(df) < sig.SMA_LEN + 30:
-                        missing.append((t, "no data before asof")); continue
                 df = sig.add_indicators(df)
                 cfg_t = cfg if a.no_profile else profiles.cfg_for(t, cfg)
                 b = sig.buy_signal(df, cfg_t)
-                last = df.iloc[-1]
-                nonlocal asof_date
-                asof_date = df.index[-1].date()
                 if bool(b.iloc[-1]):
-                    hits.append((t, sig.trade_plan(last, a.equity, a.risk)))
+                    hits.append((t, sig.trade_plan(df.iloc[-1], a.equity, a.risk)))
             except Exception as e:
                 missing.append((t, str(e)[:40]))
 
@@ -403,6 +416,11 @@ def main():
     if dropped:
         print("\n  removed (was flagged SELL on a prior run): "
               + ", ".join(_nm(r["ticker"]) for r in dropped))
+
+    if stale:
+        print(f"\n  ⚠ stale data — last bar older than scan bar {asof_str}, excluded from "
+              "BUY eval: " + ", ".join(f"{t.replace('.BK','')}({d})" for t, d in stale[:15])
+              + ("…" if len(stale) > 15 else ""))
 
     if missing:
         print(f"\n  skipped {len(missing)} (no/short data): "

@@ -1,24 +1,18 @@
-SET Bull Scan (2026-07-09)
+SET Bull Scan (2026-07-10)
 
-ตลาด: 52/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 2  brk 4  rcl 17
+ตลาด: 58/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 7  brk 11  rcl 4  gld 1
 
-★ Q1 leader + trigger (8):
+★ Q1 leader + trigger (6):
 Ticker  sig          Buy     Stop       T1     Size
 ---------------------------------------------------
-STECON  dip+rcl    18.30    17.40    19.20   16,666
-KCE     rcl        40.75    36.25    45.25    3,333
-AMATA   rcl        26.75    25.25    28.25    9,999
-SCGP    rcl        28.50    26.50    30.50    7,500
-KTB     brk        40.50    36.25    44.75    3,528
-STGT    rcl        10.70     9.95    11.45   19,999
-WHA     rcl         5.10     4.96     5.24  107,142
-CK      dip+rcl    19.80    18.70    20.90   13,635
+STECON  dip        18.70    17.40    20.00   11,538
+KCE     brk        42.50    36.25    48.75    2,400
+AMATA   dip+brk    28.50    25.25    31.75    4,614
+HANA    rcl        37.50    34.00    41.00    4,285
+CCET    rcl         8.95     8.10     9.80   17,646
+WHA     dip+brk     5.40     4.96     5.84   34,090
 
 Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
-
-วิเคราะห์:
-- เข้าง่าย/เสี่ยงต่ำ (ชิด EMA+ADXแข็ง): STECON, AMATA, SCGP, STGT, WHA
-- overbought RSI≥78: KTB
 
 ★=Q1 leader  *=ยืด >10% เหนือ EMA

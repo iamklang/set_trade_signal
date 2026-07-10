@@ -124,9 +124,9 @@ def test_dropped_name_skipped_during_cooldown():
 def test_reentry_allowed_after_cooldown_elapses():
     state, _ = pos.update({}, [_hit("X.BK")], _fr(10.0), "2026-07-01")
     state, _ = pos.update(state, [], _fr(8.9), "2026-07-02")          # STOP flagged
-    state, _ = pos.update(state, [], _fr(8.9), "2026-07-03")          # dropped @ 07-03
-    # 5+ calendar days later -> cooldown cleared, a fresh signal re-enters normally
-    state, tr = pos.update(state, [_hit("X.BK")], _fr(10.0), "2026-07-09")
+    state, _ = pos.update(state, [], _fr(8.9), "2026-07-03")          # dropped @ 07-03 (Fri)
+    # 5 XBKK trading sessions later (Mon 06 … Fri 10) -> cooldown cleared, re-enters normally
+    state, tr = pos.update(state, [_hit("X.BK")], _fr(10.0), "2026-07-10")
     assert state["X.BK"]["state"] == "HOLDING"
     assert [r["ticker"] for r in tr["holding"]] == ["X.BK"]
     assert not tr["skipped"]

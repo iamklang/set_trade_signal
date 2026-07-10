@@ -43,15 +43,37 @@ MAX_POSITIONS = 12     # default cap on concurrent holdings (keep the strongest 
 # Cooldown after a full exit, before the same name can re-enter — mirrors the 5-BAR cooldown
 # every backtest (bt_exits.py, bt_portfolio.py) assumes when measuring the shipped edge. Without
 # this, live can churn a stopped-out name back in on the very next signal, which the backtests
-# never modeled (their reported PF/Sharpe implicitly assume this gap exists). Calendar days are
-# an approximation of "5 trading bars" (scan_dip runs ~once per session) — close enough given
-# the cooldown's role is damping whipsaw re-entries, not a tuned edge parameter itself.
-COOLDOWN_DAYS = 5
+# never modeled (their reported PF/Sharpe implicitly assume this gap exists). Counted in XBKK
+# TRADING SESSIONS (matching the backtests' bar unit — 5 calendar days spanning a weekend is
+# only ~3 bars, which let live re-enter earlier than the measured edge); falls back to calendar
+# days when exchange_calendars is unavailable.
+COOLDOWN_BARS = 5
 _COOLDOWN_KEY = "_cooldown"           # reserved top-level key: {ticker: date_last_dropped}
+
+try:
+    import exchange_calendars as _xcals
+    _CAL = _xcals.get_calendar("XBKK")
+except Exception:
+    _CAL = None
 
 
 def _days_since(then, now):
     return (date.fromisoformat(str(now)) - date.fromisoformat(str(then))).days
+
+
+def _bars_since(then, now):
+    """XBKK trading sessions strictly after `then`, up to and including `now` — the unit the
+    backtests' 5-bar cooldown is measured in. Calendar-day fallback without the calendar."""
+    if _CAL is not None:
+        try:
+            import pandas as _pd
+            a, b = _pd.Timestamp(str(then)), _pd.Timestamp(str(now))
+            if b <= a:
+                return 0
+            return int(_CAL.sessions_in_range(a + _pd.Timedelta(days=1), b).size)
+        except Exception:
+            pass
+    return _days_since(then, now)
 
 
 def load(path=DEFAULT_PATH):
@@ -169,7 +191,7 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
       sell_today = names fully exited THIS run (trail/stop/breakeven/rotate) — show once, drop next
       dropped    = names removed this run (were flagged on a prior run)
       skipped    = fresh hits not admitted — book full of stronger names, OR still on cooldown
-                   (COOLDOWN_DAYS since a full exit; tickers, reason not distinguished)"""
+                   (COOLDOWN_BARS trading sessions since a full exit; tickers, reason not distinguished)"""
     positions = {t: dict(r) for t, r in positions.items()}
     fired_today = {t for t, _ in fresh_hits}
     trans = {"holding": [], "t1_today": [], "sell_today": [], "dropped": [], "skipped": []}
@@ -185,7 +207,7 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
             del positions[t]
             cooldown[t] = asof_date
     # Purge cleared cooldowns so the ledger doesn't grow forever.
-    cooldown = {t: d for t, d in cooldown.items() if _days_since(d, asof_date) < COOLDOWN_DAYS}
+    cooldown = {t: d for t, d in cooldown.items() if _bars_since(d, asof_date) < COOLDOWN_BARS}
     if cooldown:
         positions[_COOLDOWN_KEY] = cooldown
     elif _COOLDOWN_KEY in positions:
@@ -201,7 +223,7 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
         if ex and ex.get("state") == HOLDING:
             ex["last_seen"] = asof_date
             continue
-        if t in cooldown and _days_since(cooldown[t], asof_date) < COOLDOWN_DAYS:
+        if t in cooldown and _bars_since(cooldown[t], asof_date) < COOLDOWN_BARS:
             trans["skipped"].append(t)
             continue
         cooldown.pop(t, None)
