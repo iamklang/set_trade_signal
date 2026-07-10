@@ -372,7 +372,13 @@ def main():
     cap = a.max_positions if a.max_positions and a.max_positions > 0 else None
     pstate, trans = pos.update(pstate, hits, pos_frames, asof_str,
                                ranks=ranks, max_positions=cap)
-    pos.save(pstate)
+    # A historical spot-check must NEVER overwrite the live book: --asof advances the
+    # lifecycle from TODAY's positions.json as if it were that past bar (mixed state),
+    # so persist only when scanning the latest bar.
+    if a.asof:
+        print("\n  (--asof spot-check: positions.json NOT saved)")
+    else:
+        pos.save(pstate)
 
     def _nm(t):
         return str(t).replace(".BK", "")
