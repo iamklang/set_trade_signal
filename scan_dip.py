@@ -74,7 +74,7 @@ def check_trading_day(requested: date) -> tuple[bool, date]:
 def parse_args():
     p = argparse.ArgumentParser(description="SET BUY(dip) scanner")
     p.add_argument("--universe", default="set100.bk.txt", help="ticker file (one .BK per line)")
-    p.add_argument("--equity", type=float, default=1_000_000, help="account equity (THB)")
+    p.add_argument("--equity", type=float, default=100_000, help="account equity (THB)")
     p.add_argument("--risk", type=float, default=1.0, help="risk per trade (percent)")
     p.add_argument("--rsi", type=int, default=sig.RSI_MIN, help="RSI(14) minimum")
     p.add_argument("--adx", type=int, default=sig.ADX_MIN, help="ADX(14) minimum")

@@ -22,7 +22,7 @@ fi
 cd "$PROJ"
 echo "===== daily_scan @ $(date '+%Y-%m-%d %H:%M') ====="
 echo "--- 1/2 dip scan + composite rank + validate ---"
-"$PY" scan_dip.py --composite "$@"
+"$PY" scan_dip.py --composite --equity 100000 "$@"
 echo "--- 2/3 bull scan (writes bull_msg.txt; LINE folded into the 17:30 alert) ---"
 "$PY" scan_bull.py --no-line
 echo "--- 3/3 collect NVDR snapshot (builds foreign-flow history for a future weak signal) ---"
