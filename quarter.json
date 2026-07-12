@@ -1,7 +1,7 @@
 {
   "quarter": "2026Q3",
   "start_date": "2026-07-12",
-  "start_equity": 1000000,
+  "start_equity": 100000,
   "risk_per_trade_pct": 1.0,
   "max_positions": 12,
   "max_drawdown_pct": 8.0,
