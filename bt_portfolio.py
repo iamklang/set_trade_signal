@@ -92,7 +92,7 @@ def run(cap, dates, CLOSE, EMA, BUY, LL, month_ends, mscores, mquint, weight_fn=
     factor: 'voltgt' (target 18% vol via trailing market vol `mvol`), 'ddbrake' (halve sizing
     when the portfolio is >12% off its peak), 'regime' (halve when the index `idx` is below its
     200-SMA `idxsma`), or 'combo' (voltgt×ddbrake). Returns (equity, trades, rotations, avg_open)."""
-    weight_fn = weight_fn or (lambda s, q: 1.0)
+    weight_fn = weight_fn or (lambda s, q, v: 1.0)   # equal-weight; sig matches mult()'s 3-arg call
     cost_fn = cost_fn or (lambda px: COST)      # per-SIDE cost as a fraction of the fill price
     cash = 1.0
     peak = 1.0
