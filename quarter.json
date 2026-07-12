@@ -1,0 +1,10 @@
+{
+  "quarter": "2026Q3",
+  "start_date": "2026-07-12",
+  "start_equity": 1000000,
+  "risk_per_trade_pct": 1.0,
+  "max_positions": 12,
+  "max_drawdown_pct": 8.0,
+  "action_on_breach": "halve position size (regime brake) until equity recovers above the -8% line",
+  "notes": "Q-Open baseline 2026Q3. Medallion-style: many small positive-expectancy bets, breadth over size, risk control above all. Book cleared to a fresh start on this date. Tune numbers to real account capital."
+}
