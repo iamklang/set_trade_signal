@@ -27,6 +27,7 @@ import pandas as pd
 import yfinance as yf
 
 import setdw_signal as sig
+import bullish_signals as bull
 import set_data
 import profiles
 import costs
@@ -90,6 +91,9 @@ def parse_args():
                    help="SET parallel fetch workers (default 6; lower if WAF re-challenges)")
     p.add_argument("--cache-hours", type=float, default=0,
                    help="reuse data/<SYM>.csv if younger than N hours (0=always fresh)")
+    p.add_argument("--entry", default="dip_or_brk", choices=["dip", "dip_or_brk"],
+                   help="entry signal: dip (original BUY dip only) or dip_or_brk "
+                        "(dip OR breakout — bt_weekly proved PF 1.96 Q1 vs 1.33 dip-only, default)")
     p.add_argument("--sort", default="adx", choices=["adx", "dist", "rsi"], help="sort key (desc)")
     p.add_argument("--composite", action="store_true",
                    help="rank the universe by the cross-sectional composite factor "
@@ -133,10 +137,45 @@ def load_universe(path):
     return out
 
 
+def book_equity(here, fallback_equity):
+    """(equity_now, peak) for the ddbrake leg of the exposure overlay. equity_now = quarter.json
+    start_equity + this quarter's P/L (realized closed + open unrealized, reconstructed by
+    quarterly_review from git history); peak is carried in market_regime.json and ratcheted up.
+    Degrades to (start_equity, start_equity) — ddbrake off, factor 1.0 — whenever quarter.json or
+    the git reconstruction is unavailable, so a data/repo gap never brakes sizing."""
+    import json as _json
+    start_eq = fallback_equity
+    try:
+        with open(os.path.join(here, "quarter.json")) as f:
+            start_eq = float(_json.load(f).get("start_equity") or fallback_equity)
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    equity_now = start_eq
+    try:
+        import quarterly_review as qrev
+        snaps = qrev.snapshots()
+        if snaps:
+            q = qrev.quarter_of(snaps[-1][0])
+            closed = [t for t in qrev.closed_trades(snaps)
+                      if t["exit_date"] and qrev.quarter_of(t["exit_date"]) == q]
+            opens = qrev.open_positions(snaps)
+            equity_now = start_eq + sum(t["pl_baht"] for t in closed) + sum(o["pl_baht"] for o in opens)
+    except Exception:
+        equity_now = start_eq
+    prev_peak = start_eq
+    try:
+        with open(os.path.join(here, "market_regime.json")) as f:
+            prev_peak = float(_json.load(f).get("peak") or start_eq)
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return round(equity_now, 2), round(max(prev_peak, equity_now, start_eq), 2)
+
+
 def main():
     a = parse_args()
     cfg = {"rsi_min": a.rsi, "adx_min": a.adx, "maxext": a.maxext,
            "need_vol_conf": not a.novol}
+    entry_sigs = ["dip"] if a.entry == "dip" else ["dip", "breakout"]
     tickers = load_universe(a.universe)
     today = date.today()
     requested_date = date.fromisoformat(a.asof) if a.asof else today
@@ -185,11 +224,14 @@ def main():
             if last_bar[t] != asof_date:
                 stale.append((t, last_bar[t])); continue
             try:
-                df = sig.add_indicators(df)
                 cfg_t = cfg if a.no_profile else profiles.cfg_for(t, cfg)
-                b = sig.buy_signal(df, cfg_t)
-                if bool(b.iloc[-1]):
-                    hits.append((t, sig.trade_plan(df.iloc[-1], a.equity, a.risk)))
+                d = bull.add_signals(df, cfg_t)
+                row = d.iloc[-1]
+                fired = [s for s in entry_sigs if bool(row.get(s))]
+                if fired:
+                    plan = sig.trade_plan(row, a.equity, a.risk)
+                    plan["signals"] = fired
+                    hits.append((t, plan))
             except Exception as e:
                 missing.append((t, str(e)[:40]))
 
@@ -218,10 +260,20 @@ def main():
                 kept.append((t, pl))
         hits = kept
 
-    # Market-regime brake: halve new position size when the equal-weight SET index is below
-    # its 200-SMA (risk-off). Default ON; --no-regime-brake disables (regime_mult stays 1.0).
-    reg = sig.market_regime(frames, asof=(asof if a.asof else None))
-    regime_mult = 1.0 if a.no_regime_brake else reg["factor"]
+    # Combo EXPOSURE OVERLAY (voltgt × ddbrake) — the robust replacement for the old regime brake
+    # (bt_portfolio 2026-07-12 sweep: combo lifts Sharpe on 10y/5y/tickliq and cuts maxDD, where
+    # the plain index<200-SMA regime brake failed the 5y OOS test). voltgt de-risks when the tape
+    # is hot; ddbrake halves new sizing when the book is >12% off its equity peak. Default ON;
+    # --no-regime-brake disables (regime_mult stays 1.0). Skip the book (ddbrake) leg for --asof
+    # historical scans, where today's live book doesn't reflect that date.
+    _here0 = os.path.dirname(os.path.abspath(__file__))
+    if a.asof:
+        equity_now, peak = None, None
+    else:
+        equity_now, peak = book_equity(_here0, a.equity)
+    exp = sig.exposure_overlay(frames, equity_now=equity_now, peak=peak,
+                               asof=(asof if a.asof else None))
+    regime_mult = 1.0 if a.no_regime_brake else exp["factor"]
 
     # Cross-sectional composite ranking (optional) — tag hits with quintile/rank and,
     # with --leaders-only, keep just the top-quintile trend leaders. The composite needs
@@ -268,7 +320,7 @@ def main():
             for t, p in hits:
                 p["comp"] = round(float(comp.loc[t, "composite"]), 3) if t in comp.index else None
                 q = int(comp.loc[t, "quintile"]) if t in comp.index else None
-                # Composite-quintile size tilt (Q1 1.5× … Q5 0.5×) × market-regime brake
+                # Composite-quintile size tilt (Q1 1.5× … Q5 0.5×) × combo exposure overlay
                 sig.apply_size_tilt(p, q, regime_mult)
             if a.leaders_only:
                 hits = [(t, p) for t, p in hits if p.get("quintile") == 1]
@@ -285,20 +337,23 @@ def main():
             print(f"  saved composite ranking -> {os.path.basename(rank_path)} "
                   f"({len(out)} names)")
 
-    # Apply the regime brake even without --composite (no quintile info, so tilt is neutral
-    # but the risk-off ×0.5 still applies); with --composite it was already folded in above.
+    # Apply the exposure overlay even without --composite (no quintile info, so tilt is neutral
+    # but the combo ×factor still applies); with --composite it was already folded in above.
     if comp is None and regime_mult != 1.0:
         for _, p in hits:
             sig.apply_size_tilt(p, None, regime_mult)
 
-    # Persist the regime for alert.py to apply the same brake to its watchlist fires + display.
-    _here0 = os.path.dirname(os.path.abspath(__file__))
+    # Persist the exposure overlay for alert.py to apply the same brake to its watchlist fires +
+    # display. `factor` stays the field name every reader (alert.py, load_market_regime) expects.
     try:
         import json as _json
         with open(os.path.join(_here0, "market_regime.json"), "w") as _rf:
-            _json.dump({"asof": asof_str, "risk_off": reg["risk_off"], "factor": regime_mult,
-                        "index": reg["index"], "sma": reg["sma"],
-                        "brake_enabled": not a.no_regime_brake}, _rf)
+            _json.dump({"asof": asof_str, "factor": regime_mult,
+                        "voltgt": exp["voltgt"], "ddbrake": exp["ddbrake"],
+                        "mkt_vol": exp["mkt_vol"], "dd": exp["dd"],
+                        "equity": equity_now, "peak": peak,
+                        "risk_off": exp["risk_off"], "index": exp["index"], "sma": exp["sma"],
+                        "brake_enabled": not a.no_regime_brake}, _rf, indent=2)
     except OSError:
         pass
 
@@ -307,7 +362,8 @@ def main():
     hits.sort(key=keymap[a.sort], reverse=True)
 
     # Report
-    print(f"\nSET DW Swing — BUY(dip) scan | src {a.source} | as of {asof_str} | universe {a.universe} "
+    entry_lbl = "dip" if a.entry == "dip" else "dip|brk"
+    print(f"\nSET DW Swing — BUY({entry_lbl}) scan | src {a.source} | as of {asof_str} | universe {a.universe} "
           f"({len(tickers)} names) | RSI>={a.rsi} ADX>={a.adx}"
           + ("" if a.novol else " vol>avg")
           + (f" maxExt={a.maxext}%" if a.maxext else "")
@@ -315,12 +371,17 @@ def main():
           + (f" | composite {a.comp_weights}" + (" leaders-only" if a.leaders_only else "")
              if comp is not None else "") + "\n")
 
-    if reg["index"] is not None:
-        if reg["risk_off"] and not a.no_regime_brake:
-            print(f"  ⚠ MARKET RISK-OFF (index {reg['index']:.2f} < 200-SMA {reg['sma']:.2f}) "
-                  f"→ regime brake ON, size ×{sig.REGIME_RISK_OFF_MULT}\n")
-        elif reg["risk_off"]:
-            print(f"  ⚠ market risk-off (index<200-SMA) but --no-regime-brake → size NOT braked\n")
+    if exp["mkt_vol"] is not None and regime_mult < 1.0 and not a.no_regime_brake:
+        bits = []
+        if exp["voltgt"] < 1.0:
+            bits.append(f"voltgt ×{exp['voltgt']} (mkt vol {exp['mkt_vol']*100:.0f}% > "
+                        f"target {sig.TARGET_VOL*100:.0f}%)")
+        if exp["ddbrake"] < 1.0:
+            bits.append(f"ddbrake ×{exp['ddbrake']} (book {exp['dd']*100:+.0f}% off peak)")
+        print(f"  ⚠ EXPOSURE BRAKE: size ×{regime_mult} — " + "; ".join(bits) + "\n")
+    elif exp["mkt_vol"] is not None and exp["voltgt"] < 1.0 and a.no_regime_brake:
+        print(f"  ⚠ market vol {exp['mkt_vol']*100:.0f}% > target but --no-regime-brake "
+              f"→ size NOT braked\n")
 
     if comp is not None:
         print(f"  Top composite leaders (weights mom,trend,lowvol={a.comp_weights}, Q1=top quintile):")
@@ -334,16 +395,18 @@ def main():
         print()
 
     if not hits:
-        print("  no BUY(dip) signals today.\n")
+        print(f"  no BUY({entry_lbl}) signals today.\n")
     else:
         qcol = f"{'Q':>3s}" if comp is not None else ""
+        sigcol = "  sig" if a.entry != "dip" else ""
         hdr = (f"{'ticker':12s}{'close':>9s}{'dist%':>7s}{'RSI':>6s}{'ADX':>6s}"
-               f"{'buy':>9s}{'stop':>9s}{'T1':>9s}{'T2':>9s}{'size':>9s}{qcol}")
+               f"{'buy':>9s}{'stop':>9s}{'T1':>9s}{'T2':>9s}{'size':>9s}{qcol}{sigcol}")
         print(hdr); print("-" * len(hdr))
         for t, p in hits:
             q = f"{p.get('quintile'):>3d}" if comp is not None and p.get('quintile') else ("" if comp is None else f"{'-':>3s}")
+            stag = "  " + "|".join(p.get("signals", [])) if a.entry != "dip" else ""
             print(f"{t:12s}{p['close']:>9.2f}{p['distPct']:>+7.1f}{p['rsi']:>6.0f}{p['adx']:>6.0f}"
-                  f"{p['buy']:>9.2f}{p['stop']:>9.2f}{p['t1']:>9.2f}{p['t2']:>9.2f}{p['size']:>9,d}{q}")
+                  f"{p['buy']:>9.2f}{p['stop']:>9.2f}{p['t1']:>9.2f}{p['t2']:>9.2f}{p['size']:>9,d}{q}{stag}")
         tag = " (top-quintile leaders)" if a.leaders_only else ""
         print(f"\n  {len(hits)} signal(s){tag}.  Watchlist: " + " ".join(t for t, _ in hits))
         print("  buy = ราคา limit ที่ควรตั้งซื้อวันถัดไป (ที่ราคานี้หรือดีกว่า — อย่าไล่ราคาที่ gap ขึ้น)")
@@ -439,7 +502,8 @@ def main():
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     if hits:
         csv_path = a.csv or f"dip_scan_{asof_str}_{run_ts}.csv"
-        rows = [{"ticker": t, **{k: round(v, 4) if isinstance(v, float) else v
+        rows = [{"ticker": t, **{k: ("|".join(v) if k == "signals" and isinstance(v, list)
+                                     else round(v, 4) if isinstance(v, float) else v)
                                  for k, v in p.items()}} for t, p in hits]
         pd.DataFrame(rows).to_csv(csv_path, index=False)
         print(f"  saved {csv_path}\n")

@@ -235,6 +235,7 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
             "rsi": _r(p.get("rsi"), 0), "adx": _r(p.get("adx"), 0),
             "size": p.get("size"), "size_mult": p.get("size_mult"),
             "regime_mult": p.get("regime_mult"), "quintile": p.get("quintile"),
+            "signals": p.get("signals"),
             "first_seen": (ex or {}).get("first_seen", asof_date), "last_seen": asof_date,
             "t1_date": None, "flagged_date": None,
         }

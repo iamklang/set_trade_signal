@@ -35,6 +35,7 @@ TREND_LOOK = 200        # SMA200 trend reference
 VOL_LOOK = 120          # ~6 months realised-vol window
 MIN_BARS = MOM_LOOK + MOM_SKIP + 5      # history needed before a name is scorable
 
+Z_CLIP = 3.0                            # winsorize z-scores to ±3 (guards against outliers)
 FACTORS = ("mom", "trend", "lowvol")    # quality slots in here once fundamentals exist
 # SET100 12y walk-forward (scratchpad/bt_composite.py): mom+trend is the effective
 # SELECTION blend — Q1 CAGR 20.4% / Sharpe 1.02 / PF 2.36 / net 18.8%, beating both
@@ -104,6 +105,10 @@ def cross_section_scores(frames, asof=None, weights=None, quality=None):
             continue
         mu, sd = col[valid].mean(), col[valid].std()
         z = (col - mu) / sd if sd and sd > 0 else pd.Series(0.0, index=R.index)
+        # Winsorize: on a ~100-name universe one runaway name (e.g. a +150% squeeze) drags
+        # the whole cross-section's mean/sd and distorts every OTHER name's quintile; bounding
+        # factor scores is the standard guard (clipped z / bounded tilts improve OOS stability).
+        z = z.clip(-Z_CLIP, Z_CLIP)
         R["z_" + f] = z.fillna(0.0)                     # missing -> neutral
         num = num + R["z_" + f] * w
         den += abs(w)

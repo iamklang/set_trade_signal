@@ -193,11 +193,22 @@ def apply_size_tilt(plan, quintile, regime_mult=1.0):
 # windows while ~holding 10y return; a risk-off drawdown guard for the leveraged DW context.
 REGIME_RISK_OFF_MULT = 0.5
 
+# Combo EXPOSURE OVERLAY (bt_portfolio.py overlay='combo' = voltgt × ddbrake). The 2026-07-12
+# portfolio sweep showed combo is the robust exposure control: it lifts Sharpe on BOTH the 10y
+# (0.91→1.05) and recent-5y windows AND under realistic tick+liquidity costs (0.91→1.13), while
+# cutting maxDD to ~-31% (10y) / -28% (tickliq). The plain `regime` brake (index<200SMA, the OLD
+# live behaviour) FAILED that 5y out-of-sample test (Sharpe 0.29) — combo replaces it.
+#   voltgt : scale new exposure by TARGET_VOL / trailing-20d annualised market vol, floored 0.3,
+#            capped 1.0 (de-risk when the tape is hot; never lever up).
+#   ddbrake: halve new exposure when the book is ≥ DD_BRAKE off its equity peak.
+TARGET_VOL = 0.18       # annualised vol target for the voltgt leg
+DD_BRAKE = 0.12         # book drawdown from peak that halves new sizing
+VOLTGT_FLOOR = 0.3      # never shrink the voltgt leg below this
 
-def market_regime(frames, asof=None, sma_len=SMA_LEN):
-    """Equal-weight-universe regime: is the index below its 200-SMA (risk-off)? Returns
-    {risk_off, factor, index, sma}; factor = REGIME_RISK_OFF_MULT when risk-off else 1.0.
-    Missing/short data -> risk-on (factor 1.0) so a data gap never brakes sizing."""
+
+def _equal_weight_index(frames, asof=None):
+    """Equal-weight universe price index (cumulative mean daily return), or None if no usable
+    Close data. Shared by market_regime() and exposure_overlay()."""
     closes = {}
     for t, df in frames.items():
         if df is None or not hasattr(df, "columns") or "Close" not in df.columns:
@@ -207,12 +218,52 @@ def market_regime(frames, asof=None, sma_len=SMA_LEN):
             s = s[s.index <= asof]
         if len(s):
             closes[t] = s
-    off = {"risk_off": False, "factor": 1.0, "index": None, "sma": None}
     if not closes:
-        return off
+        return None
     px = pd.DataFrame(closes).sort_index()
-    idx = (1 + px.pct_change().mean(axis=1).fillna(0)).cumprod()
-    if len(idx) < sma_len + 1:
+    return (1 + px.pct_change().mean(axis=1).fillna(0)).cumprod()
+
+
+def exposure_overlay(frames, equity_now=None, peak=None, asof=None, vol_look=20):
+    """Combo exposure scaler for NEW-entry sizing = voltgt × ddbrake, matching bt_portfolio's
+    overlay='combo'. Returns {factor, voltgt, ddbrake, mkt_vol, dd, risk_off, index, sma}.
+    Missing data or missing equity/peak degrade gracefully to 1.0 for that leg (never brake on a
+    gap). `equity_now`/`peak` are the book's mark-to-market equity and its running peak; omit
+    them to get the voltgt leg alone (ddbrake=1.0)."""
+    out = {"factor": 1.0, "voltgt": 1.0, "ddbrake": 1.0, "mkt_vol": None,
+           "dd": None, "risk_off": False, "index": None, "sma": None}
+    idx = _equal_weight_index(frames, asof)
+    # voltgt leg — trailing annualised market vol
+    if idx is not None and len(idx) >= vol_look + 1:
+        vol = float(idx.pct_change().rolling(vol_look).std().iloc[-1]) * (252 ** 0.5)
+        if vol and vol > 0 and not pd.isna(vol):
+            out["mkt_vol"] = round(vol, 4)
+            out["voltgt"] = round(min(1.0, max(VOLTGT_FLOOR, TARGET_VOL / vol)), 4)
+        # risk_off flag kept for INFO/display only (not applied — regime leg failed OOS)
+        if len(idx) >= SMA_LEN + 1:
+            sv = idx.rolling(SMA_LEN).mean().iloc[-1]
+            if not pd.isna(sv):
+                out["index"], out["sma"] = round(float(idx.iloc[-1]), 4), round(float(sv), 4)
+                out["risk_off"] = bool(float(idx.iloc[-1]) < float(sv))
+    # ddbrake leg — halve when the book is DD_BRAKE off its peak
+    if equity_now is not None and peak and peak > 0:
+        dd = equity_now / peak - 1.0
+        out["dd"] = round(dd, 4)
+        if dd <= -DD_BRAKE:
+            out["ddbrake"] = 0.5
+    out["factor"] = round(out["voltgt"] * out["ddbrake"], 4)
+    return out
+
+
+def market_regime(frames, asof=None, sma_len=SMA_LEN):
+    """Equal-weight-universe regime: is the index below its 200-SMA (risk-off)? Returns
+    {risk_off, factor, index, sma}; factor = REGIME_RISK_OFF_MULT when risk-off else 1.0.
+    Missing/short data -> risk-on (factor 1.0) so a data gap never brakes sizing.
+    NOTE: kept for reference/back-compat; the live sizing path now uses exposure_overlay()
+    (combo), since this plain regime brake failed the 5y out-of-sample test."""
+    off = {"risk_off": False, "factor": 1.0, "index": None, "sma": None}
+    idx = _equal_weight_index(frames, asof)
+    if idx is None or len(idx) < sma_len + 1:
         return off
     sma = idx.rolling(sma_len).mean()
     iv, sv = float(idx.iloc[-1]), sma.iloc[-1]
