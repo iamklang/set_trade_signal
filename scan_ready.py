@@ -30,6 +30,7 @@ import setdw_signal as sig
 import bullish_signals as bull
 import set_data
 import profiles
+import positions as pos
 import line_notify
 
 BREAKOUT_NEAR_PCT = 2.0
@@ -124,7 +125,8 @@ def classify(df, t, cfg):
     return out
 
 
-def format_line_message(ready, scan_date=""):
+def format_line_message(ready, scan_date="", holding=None, sell_today=None,
+                        t1_today=None, capital_info=None):
     header = "SET DW Ready List"
     if scan_date:
         header += f" ({scan_date})"
@@ -165,6 +167,12 @@ def format_line_message(ready, scan_date=""):
         lines.append("ไม่มีตัวใกล้ trigger วันนี้")
 
     lines.append("★=Q1 leader · DIP=ย่อชน EMA เด้ง · BRK=ทะลุ high 20 วัน")
+
+    section = line_notify.format_positions_section(
+        holding, sell_today, t1_today, capital_info=capital_info)
+    if section:
+        lines.append("")
+        lines.append(section)
     return "\n".join(lines)
 
 
@@ -229,8 +237,33 @@ def main():
     print(f"  {total_ready} ready + {len([r for r in ready if r['category'] == 'ALMOST'])} almost"
           f" (out of {len(results)} in-trend names)")
 
+    pstate = pos.load()
+    holding, t1_today, sell_today = pos.holding_view(pstate, asof=scan_date or None)
+    for r in holding + t1_today + sell_today:
+        r["quintile"] = ranks.get(r["ticker"])
+    committed = pos.committed_capital(pstate)
+    equity = 100_000
+    avail_cap = max(0, equity - committed)
+    capital_info = {"equity": equity, "committed": committed,
+                    "available": avail_cap,
+                    "pct_available": avail_cap / equity * 100 if equity > 0 else 0}
+
+    if sell_today or t1_today or holding:
+        print("\n  managed watchlist (positions.json):")
+        for r in sell_today:
+            print(f"    🔴 {r['ticker']:10s} SELL {r.get('sell_reason','?')} — {pos.sell_note(r.get('sell_reason'))}")
+        for r in t1_today:
+            print(f"    🔵 {r['ticker']:10s} T1 — {pos.t1_note()}")
+        for r in holding:
+            pl = f"{r['pl_pct']:+.1f}%" if r.get("pl_pct") is not None else "n/a"
+            lead = " ★Q1" if r.get("quintile") == 1 else ""
+            print(f"    {r['ticker']:10s} {r.get('status','?'):5s} "
+                  f"entry {r.get('entry_close')} now {r.get('cur')} ({pl}){lead}")
+
     if not a.no_line:
-        msg = format_line_message(ready, scan_date or "")
+        msg = format_line_message(ready, scan_date or "",
+                                  holding=holding, sell_today=sell_today,
+                                  t1_today=t1_today, capital_info=capital_info)
         if line_notify.send_line_push(msg):
             print("  LINE ready-list sent.")
         else:

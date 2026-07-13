@@ -142,6 +142,7 @@ def trade_plan(row, equity, risk_pct, rr1=RR1, rr2=RR2):
     if size > 0 and close > 0:
         max_by_capital = int(np.floor(equity / close))
         size = min(size, max_by_capital)
+    size = size // 100 * 100
     return {
         "close": close,
         # Next-day entry: the signal-bar close is the reference the whole plan (stop/target/
@@ -186,7 +187,7 @@ def apply_size_tilt(plan, quintile, regime_mult=1.0):
     plan["size_base"] = base
     plan["size_mult"] = mult
     plan["regime_mult"] = regime_mult
-    plan["size"] = int(np.floor(base * mult * regime_mult))
+    plan["size"] = int(np.floor(base * mult * regime_mult)) // 100 * 100
     plan["quintile"] = quintile
     return plan
 

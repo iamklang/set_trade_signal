@@ -11,6 +11,9 @@
 # EOD pipeline (รันหลังตลาดปิด ~17:00)
 ./daily_scan
 
+# Morning ready-list (รันก่อนตลาดเปิด ~08:30)
+./morning_scan
+
 # สแกนด้วยมือ
 ~/.venvs/trading-dr/bin/python scan_dip.py --composite --equity 100000
 
@@ -18,6 +21,16 @@
 ~/.venvs/trading-dr/bin/python trade_dashboard.py
 # -> http://localhost:8060
 ```
+
+## Daily Alert Flow (launchd)
+
+| Job | เวลา | Script | ส่งอะไรไป LINE |
+|---|---|---|---|
+| `com.klang.set-morning` | 08:30 จ-ศ | `morning_scan` → `scan_ready.py` | DIP/BRK READY list + holdings + สัญญาณขาย |
+| `com.klang.set-scan` | 17:00 จ-ศ | `daily_scan` → scan_dip + scan_bull + NVDR + git | (เตรียมข้อมูลให้ alert) |
+| `com.klang.kce-alert` | 17:30 จ-ศ | `alert.py` | BUY signals + holdings + ขาย/T1 + ทุน |
+
+Plists อยู่ที่ `~/Library/LaunchAgents/com.klang.set-*.plist`
 
 ## Config
 
@@ -39,7 +52,8 @@
 | `daily_scan` | EOD pipeline รวม: scan_dip → scan_bull → collect_nvdr → git commit | `./daily_scan` |
 | `scan_dip.py` | สแกน BUY(dip\|breakout) + จัดการ positions.json | `python scan_dip.py --composite --equity 100000 --asof 2026-07-13` |
 | `scan_bull.py` | สแกนสัญญาณ bullish กว้าง (trend/breakout/reclaim/golden/dip) | `python scan_bull.py --no-line --leaders-only` |
-| `scan_ready.py` | Pre-market ready-list: หุ้นที่ใกล้จะ trigger (DIP READY/BRK READY) | `python scan_ready.py` |
+| `morning_scan` | Wrapper: self-heal venv + รัน scan_ready.py (ใช้กับ launchd) | `./morning_scan` |
+| `scan_ready.py` | Pre-market ready-list: หุ้นที่ใกล้จะ trigger + holdings + สัญญาณขาย | `python scan_ready.py` |
 
 ### แจ้งเตือน & Dashboard
 
@@ -96,6 +110,7 @@ HOLDING/FULL ────▶ HOLDING/RUN ─────────────
 ## Sizing & Rotation
 
 - **Capital-aware**: size คำนวณจากทุนที่เหลือ (equity - committed) ไม่ใช่ทุนทั้งหมด
+- **Lot size**: size ปัดลงเป็นจำนวนเต็ม 100 เสมอ (board lot SET)
 - **Quintile tilt**: Q1 × 1.5, Q2 × 1.25, Q3 × 1.0, Q4 × 0.75, Q5 × 0.5
 - **Exposure overlay**: voltgt (target 18% vol) × ddbrake (halve at 12% DD from peak)
 - **Smart rotation**: เมื่อ book เต็ม ถ้าตัวใหม่มี upside to T1 ดีกว่าตัวเก่า > 5% จะ auto-flag ขายตัวเก่า
