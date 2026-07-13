@@ -89,13 +89,14 @@ _SELL_NOTE = {
     "TRAIL": "หลุด EMA20 (หลัง T1) — ขายเก็บกำไร",
     "STOP": "หลุดสต็อป — ขายทั้งหมด",
     "BE": "กลับมาที่ทุน — ขาย เสมอตัว",
-    "ROTATE": "สับเปลี่ยนออก — เกินลิมิต เก็บตัวแข็งกว่า",
+    "ROTATE": "สับเปลี่ยนออก — ตัวใหม่มี upside ดีกว่า",
 }
 
 
 def format_positions_section(holding: list[dict] | None,
                              sell_today: list[dict] | None,
-                             t1_today: list[dict] | None = None) -> str:
+                             t1_today: list[dict] | None = None,
+                             capital_info: dict | None = None) -> str:
     """Render the stateful let-winners-run managed watchlist (positions.json) for the LINE
     brief: a SELL-today block (fully exited — trail/stop/breakeven/rotate), a T1 block (stop
     moved to breakeven, now running), then current holdings with live status/P-L. Each row:
@@ -111,6 +112,10 @@ def format_positions_section(holding: list[dict] | None,
         for r in sell_today:
             name = _disp_name(r.get("ticker"), r.get("quintile"))
             note = _SELL_NOTE.get(r.get("sell_reason"), "ขาย")
+            if r.get("sell_reason") == "ROTATE" and r.get("rotate_for"):
+                nm_new = r["rotate_for"].replace(".BK", "")
+                diff = (r.get("opp_diff") or 0) * 100
+                note = f"สับเปลี่ยน → เข้า {nm_new} (upside ดีกว่า {diff:.0f}%)"
             lines.append(f"  {name} {r.get('sell_reason','?')} เข้า {r.get('entry_close')}"
                          f" → ล่าสุด {r.get('cur')} ({_fmt_pct(r.get('pl_pct')).strip()}) — {note}")
         blocks.append("\n".join(lines))
@@ -136,6 +141,11 @@ def format_positions_section(holding: list[dict] | None,
         if any(r.get("quintile") == 1 for r in holding):
             lines.append("★=ผู้นำ composite Q1 (mom+trend)")
         blocks.append("\n".join(lines))
+    if capital_info:
+        blocks.append(f"💰 ทุน: ฿{capital_info['equity']:,.0f} | "
+                      f"ใช้ไป ฿{capital_info['committed']:,.0f} | "
+                      f"เหลือ ฿{capital_info['available']:,.0f} "
+                      f"({capital_info.get('pct_available', 0):.0f}%)")
     return "\n\n".join(blocks)
 
 
@@ -143,7 +153,8 @@ def format_alert_message(fired: list[tuple[str, dict]], scan_date: str = "",
                          validated: list[dict] | None = None,
                          holding: list[dict] | None = None,
                          sell_today: list[dict] | None = None,
-                         t1_today: list[dict] | None = None) -> str:
+                         t1_today: list[dict] | None = None,
+                         capital_info: dict | None = None) -> str:
     header = "SET DW Swing Alert"
     if scan_date:
         header += f" ({scan_date})"
@@ -174,7 +185,8 @@ def format_alert_message(fired: list[tuple[str, dict]], scan_date: str = "",
 
     # Prefer the stateful managed watchlist (positions.json); fall back to the legacy
     # validated-candidates block only when no positions were passed.
-    section = format_positions_section(holding, sell_today, t1_today)
+    section = format_positions_section(holding, sell_today, t1_today,
+                                       capital_info=capital_info)
     if not section:
         section = _format_validated_section(validated or [])
     if section:

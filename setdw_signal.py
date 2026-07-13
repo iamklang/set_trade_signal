@@ -139,6 +139,9 @@ def trade_plan(row, equity, risk_pct, rr1=RR1, rr2=RR2):
     stop = float(row["llStop"])
     risk_u = close - stop
     size = int(np.floor((equity * risk_pct / 100) / risk_u)) if risk_u > 0 else 0
+    if size > 0 and close > 0:
+        max_by_capital = int(np.floor(equity / close))
+        size = min(size, max_by_capital)
     return {
         "close": close,
         # Next-day entry: the signal-bar close is the reference the whole plan (stop/target/

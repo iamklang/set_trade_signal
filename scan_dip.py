@@ -198,6 +198,11 @@ def main():
 
     hits, missing, stale, asof_date = [], [], [], None
 
+    import positions as pos
+    pstate = pos.load()
+    committed = pos.committed_capital(pstate)
+    avail = max(0, a.equity - committed)
+
     def run_scan(fetch):
         # Pass 1: slice every frame to <= asof and find the scan bar = the LATEST last-bar
         # date across the universe. Names whose own last bar is older (halted / SP / Yahoo
@@ -229,7 +234,7 @@ def main():
                 row = d.iloc[-1]
                 fired = [s for s in entry_sigs if bool(row.get(s))]
                 if fired:
-                    plan = sig.trade_plan(row, a.equity, a.risk)
+                    plan = sig.trade_plan(row, avail, a.risk)
                     plan["signals"] = fired
                     hits.append((t, plan))
             except Exception as e:
@@ -418,12 +423,15 @@ def main():
         print(f"  ⏭ dropped thin (turnover < ฿{a.min_turnover/1e6:.0f}M/day, edge dies on wide spreads): "
               + ", ".join(f"{t.replace('.BK','')}(฿{tv/1e6:.0f}M)" for t, tv in dropped_thin))
 
+    pct = avail / a.equity * 100 if a.equity > 0 else 0
+    print(f"\n  Capital: equity ฿{a.equity:,.0f} | committed ฿{committed:,.0f} | "
+          f"available ฿{avail:,.0f} ({pct:.0f}%)")
+
     # ---- Stateful BUY/SELL managed watchlist (positions.json) --------------------
     # scan_dip is the SOLE writer: fold today's fresh BUY(dip) hits into the persistent
     # holdings list, flag any held name whose thesis broke (WEAK/STOP) to sell ONCE, and
     # drop names flagged on a prior run. alert.py reads this file for the LINE brief.
-    import positions as pos
-    pstate = pos.load()
+    # (pstate already loaded earlier for capital-aware sizing)
     # Exits must see the bar we scanned, not "today": when --asof is set, slice each frame to
     # <= asof so a historical spot-check / walk evaluates holdings on the right bar. (No --asof
     # → latest bar is the intended one, pass frames through untouched.)

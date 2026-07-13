@@ -159,7 +159,7 @@ def sell_note(reason):
         "TRAIL": "หลุด EMA20 (หลัง T1) — ขายเก็บกำไร",
         "STOP": "หลุดสต็อป — ขายทั้งหมด",
         "BE": "กลับมาที่ทุน (breakeven) — ขาย เสมอตัว",
-        "ROTATE": "สับเปลี่ยนออก — เกินลิมิต เก็บตัว composite แข็งกว่า",
+        "ROTATE": "สับเปลี่ยนออก — ตัวใหม่มี upside ดีกว่า",
     }.get(reason, "ขาย")
 
 
@@ -256,6 +256,9 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
         rec["cur"] = _r(close)
         rec["pl_pct"] = (_r((close - entry) / entry * 100, 1)
                          if close is not None and entry else None)
+        rec["eff_stop"] = _r(max(rec.get("stop", 0), ema) if phase == RUN and ema else rec.get("stop"))
+        rec["ema20"] = _r(ema)
+        rec["opp_score"] = round(opportunity_score(rec), 4) if close is not None else None
         if close is None or t in fired_today:
             rec["status"] = RUN if phase == RUN else "HOLD"
             continue
@@ -275,13 +278,13 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
         else:
             rec["status"] = RUN if phase == RUN else "HOLD"
 
-    # 4) Position cap — hold only the strongest `max_positions` by composite. A weak new entry
-    #    is silently skipped (never really opened); an over-cap EXISTING holding rotates out.
+    # 4) Position cap — hold only the strongest `max_positions` by composite + opportunity.
+    #    A weak new entry is silently skipped; an over-cap EXISTING holding rotates out.
     if max_positions and ranks is not None:
         held = [t for t, r in positions.items() if r.get("state") == HOLDING]
         if len(held) > max_positions:
             held.sort(key=lambda t: (ranks.get(t, float("-inf")),
-                                     positions[t].get("pl_pct") or -999), reverse=True)
+                                     opportunity_score(positions[t])), reverse=True)
             for t in held[max_positions:]:
                 if t in added:
                     del positions[t]
@@ -290,12 +293,63 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
                     _flag_sell(positions[t], "ROTATE", asof_date)
                     trans["sell_today"].append({**positions[t], "ticker": t})
 
+    # 4b) Proactive rotation: even at cap (not over), swap the weakest incumbent if a new
+    #     candidate has clearly better forward opportunity (upside to T1 > incumbent + 5%).
+    OPP_THRESHOLD = 0.05
+    if max_positions and ranks is not None:
+        held_all = [t for t, r in positions.items()
+                    if isinstance(r, dict) and r.get("state") == HOLDING and t != _COOLDOWN_KEY]
+        new_entries = [t for t in added
+                       if t in positions and positions[t].get("state") == HOLDING]
+        if len(held_all) >= max_positions and new_entries:
+            incumbents = {t: opportunity_score(positions[t])
+                          for t in held_all if t not in added}
+            if incumbents:
+                weakest_t = min(incumbents, key=incumbents.get)
+                weakest_opp = incumbents[weakest_t]
+                for t in new_entries:
+                    new_opp = opportunity_score(positions[t])
+                    if new_opp > weakest_opp + OPP_THRESHOLD:
+                        _flag_sell(positions[weakest_t], "ROTATE", asof_date)
+                        positions[weakest_t]["rotate_for"] = t
+                        positions[weakest_t]["opp_diff"] = round(new_opp - weakest_opp, 4)
+                        trans["sell_today"].append({**positions[weakest_t], "ticker": weakest_t})
+                        break
+
     # 5) Build the surviving holdings bucket (after exits + cap).
     for t, rec in positions.items():
         if rec.get("state") == HOLDING:
             trans["holding"].append({**rec, "ticker": t, "new": t in added})
     _sort_holding(trans["holding"])
     return positions, trans
+
+
+def opportunity_score(rec):
+    """Forward-looking: remaining % gain to T1 (FULL) or EMA trail cushion (RUN)."""
+    px = rec.get("cur") or rec.get("close") or rec.get("buy")
+    t1 = rec.get("t1")
+    if not px or not t1 or px <= 0:
+        return 0.0
+    if rec.get("phase") == RUN:
+        ema = rec.get("ema20")
+        return (px - ema) / px if ema and px > ema else 0.01
+    return max(0, (t1 - px) / px)
+
+
+def committed_capital(positions):
+    """Sum of (entry_close * size) for all HOLDING positions — capital already deployed."""
+    total = 0.0
+    for t, rec in positions.items():
+        if t == _COOLDOWN_KEY or not isinstance(rec, dict):
+            continue
+        if rec.get("state") == HOLDING:
+            total += (rec.get("entry_close") or 0) * (rec.get("size") or 0)
+    return round(total, 2)
+
+
+def available_capital(positions, total_equity):
+    """Capital available for new positions = total_equity - committed."""
+    return round(max(0, total_equity - committed_capital(positions)), 2)
 
 
 def _sort_holding(rows):

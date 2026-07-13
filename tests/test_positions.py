@@ -265,3 +265,128 @@ def test_small_drift_below_tolerance_untouched():
     f2 = {"X.BK": _df_seq([10.001] * 30 + [9.8])}            # 0.01% << ADJ_TOL
     state, _ = pos.update(state, [], f2, "2026-07-01")
     assert state["X.BK"]["stop"] == 9.0 and state["X.BK"]["entry_close"] == 10.0
+
+
+# ---- committed / available capital -------------------------------------------------------
+
+def test_committed_capital_empty():
+    assert pos.committed_capital({}) == 0
+
+def test_committed_capital_with_holdings():
+    state = {
+        "A.BK": {"state": "HOLDING", "entry_close": 10.0, "size": 100},
+        "B.BK": {"state": "HOLDING", "entry_close": 20.0, "size": 50},
+    }
+    assert pos.committed_capital(state) == 2000.0  # 10*100 + 20*50
+
+def test_committed_capital_ignores_sell_flagged():
+    state = {
+        "A.BK": {"state": "HOLDING", "entry_close": 10.0, "size": 100},
+        "B.BK": {"state": "SELL_FLAGGED", "entry_close": 20.0, "size": 50},
+    }
+    assert pos.committed_capital(state) == 1000.0
+
+def test_committed_capital_ignores_cooldown():
+    state = {
+        "A.BK": {"state": "HOLDING", "entry_close": 10.0, "size": 100},
+        pos._COOLDOWN_KEY: {"X.BK": "2026-07-01"},
+    }
+    assert pos.committed_capital(state) == 1000.0
+
+def test_available_capital():
+    state = {"A.BK": {"state": "HOLDING", "entry_close": 10.0, "size": 100}}
+    assert pos.available_capital(state, 5000) == 4000.0
+
+def test_available_capital_floored_at_zero():
+    state = {"A.BK": {"state": "HOLDING", "entry_close": 100.0, "size": 100}}
+    assert pos.available_capital(state, 5000) == 0  # committed 10000 > equity 5000
+
+
+# ---- opportunity score -------------------------------------------------------------------
+
+def test_opportunity_score_full_phase():
+    rec = {"phase": "FULL", "cur": 10.0, "t1": 12.0}
+    assert abs(pos.opportunity_score(rec) - 0.2) < 1e-6  # (12-10)/10
+
+def test_opportunity_score_near_t1():
+    rec = {"phase": "FULL", "cur": 11.9, "t1": 12.0}
+    assert pos.opportunity_score(rec) < 0.01  # very little upside left
+
+def test_opportunity_score_past_t1_run_phase_with_ema():
+    rec = {"phase": "RUN", "cur": 13.0, "t1": 12.0, "ema20": 12.5}
+    score = pos.opportunity_score(rec)
+    assert 0 < score < 0.05  # trail cushion (13-12.5)/13
+
+def test_opportunity_score_run_phase_no_ema():
+    rec = {"phase": "RUN", "cur": 13.0, "t1": 12.0}
+    assert pos.opportunity_score(rec) == 0.01  # fallback
+
+def test_opportunity_score_missing_data():
+    assert pos.opportunity_score({}) == 0.0
+    assert pos.opportunity_score({"cur": 10.0}) == 0.0
+
+
+# ---- proactive rotation ------------------------------------------------------------------
+
+def test_proactive_rotation_swaps_when_better_opportunity():
+    """New entry with clearly better upside displaces the weakest incumbent."""
+    # Seed 2 holdings, both near their T1 (low opportunity)
+    state, _ = pos.update({}, [_hit("A.BK", close=10.9, stop=9.0, t1=11.0),
+                               _hit("B.BK", close=10.8, stop=9.0, t1=11.0)],
+                          _many(["A.BK", "B.BK"]), "2026-07-01",
+                          ranks={"A.BK": 2.0, "B.BK": 1.0}, max_positions=2)
+    # New entry with fresh upside: close=10, t1=11 -> 10% opp vs ~1% for incumbents
+    frames = {**_many(["A.BK", "B.BK"]), "C.BK": _df(10.0)}
+    state, tr = pos.update(state, [_hit("C.BK", close=10.0, stop=9.0, t1=11.0)],
+                           frames, "2026-07-02",
+                           ranks={"A.BK": 2.0, "B.BK": 1.0, "C.BK": 1.5},
+                           max_positions=2)
+    rotated = [r["ticker"] for r in tr["sell_today"] if r.get("sell_reason") == "ROTATE"]
+    assert len(rotated) == 1
+    assert "C.BK" in state and state["C.BK"]["state"] == "HOLDING"
+
+def test_proactive_rotation_threshold_prevents_churn():
+    """Marginal improvement (< 5%) does NOT trigger proactive rotation."""
+    # 2 holdings near their T1 (low opp) — both have ~5% upside, similar opp
+    state, _ = pos.update({}, [_hit("A.BK", close=10.5, stop=9.0, t1=11.0),
+                               _hit("B.BK", close=10.5, stop=9.0, t1=11.0)],
+                          _many(["A.BK", "B.BK"]), "2026-07-01",
+                          ranks={"A.BK": 2.0, "B.BK": 2.0}, max_positions=3)
+    # New entry has marginally better opp (~6% vs ~5% = diff < 5% threshold)
+    frames = {**_many(["A.BK", "B.BK"]), "C.BK": _df(10.0)}
+    state, tr = pos.update(state, [_hit("C.BK", close=10.0, stop=9.0, t1=10.6)],
+                           frames, "2026-07-02",
+                           ranks={"A.BK": 2.0, "B.BK": 2.0, "C.BK": 2.0},
+                           max_positions=3)
+    rotated = [r for r in tr["sell_today"] if r.get("sell_reason") == "ROTATE"]
+    assert len(rotated) == 0
+
+def test_no_rotation_when_slots_available():
+    """No rotation when book is under max_positions — new entry just fills a slot."""
+    state, _ = pos.update({}, [_hit("A.BK")], _many(["A.BK"]), "2026-07-01",
+                          ranks={"A.BK": 2.0}, max_positions=3)
+    frames = {**_many(["A.BK"]), "B.BK": _df(10.0)}
+    state, tr = pos.update(state, [_hit("B.BK")], frames, "2026-07-02",
+                           ranks={"A.BK": 2.0, "B.BK": 1.0}, max_positions=3)
+    assert not any(r.get("sell_reason") == "ROTATE" for r in tr["sell_today"])
+    assert "B.BK" in state and state["B.BK"]["state"] == "HOLDING"
+
+
+# ---- eff_stop / ema20 / opp_score stored in update() ------------------------------------
+
+def test_eff_stop_full_phase():
+    state, tr = pos.update({}, [_hit("X.BK")], _fr(10.0), "2026-07-01")
+    assert state["X.BK"]["eff_stop"] == 9.0  # structural stop
+
+def test_eff_stop_run_phase_uses_ema():
+    state, _ = pos.update({}, [_hit("X.BK")], _fr(10.0), "2026-07-01")
+    state, _ = pos.update(state, [], _fr(11.0), "2026-07-02")  # hits T1 -> RUN
+    assert state["X.BK"]["phase"] == "RUN"
+    # Next bar (already RUN): eff_stop = max(stop=10, ema). With 30 flat bars ema≈close≈11
+    state, _ = pos.update(state, [], _fr(11.0), "2026-07-03")
+    assert state["X.BK"]["eff_stop"] >= 10.0
+
+def test_opp_score_stored():
+    state, _ = pos.update({}, [_hit("X.BK")], _fr(10.0), "2026-07-01")
+    assert state["X.BK"]["opp_score"] is not None
+    assert state["X.BK"]["opp_score"] > 0

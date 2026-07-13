@@ -334,6 +334,11 @@ def main():
     # cur/status fields were computed at scan time on the same closed bar, so no refetch.
     import positions as pos
     pstate = pos.load()
+    committed = pos.committed_capital(pstate)
+    avail_cap = max(0, a.equity - committed)
+    capital_info = {"equity": a.equity, "committed": committed,
+                    "available": avail_cap,
+                    "pct_available": avail_cap / a.equity * 100 if a.equity > 0 else 0}
     holding, t1_today, sell_today = pos.holding_view(pstate, asof=scan_date or None)
     for r in holding + t1_today + sell_today:
         r["quintile"] = ranks.get(r["ticker"])
@@ -354,7 +359,8 @@ def main():
         # watchlist dip + managed holdings / T1 / sell. Sections join with blank lines.
         alert_msg = line_notify.format_alert_message(fired, scan_date=scan_date,
                                                      holding=holding, sell_today=sell_today,
-                                                     t1_today=t1_today)
+                                                     t1_today=t1_today,
+                                                     capital_info=capital_info)
         sections = []
         if regime_factor < 1.0:
             sections.append(f"⚠ ตลาด RISK-OFF (index < 200-SMA) → ลดขนาดโพซิชัน ×{regime_factor}")
