@@ -49,3 +49,23 @@ def test_fired_on_row_lists_names():
     fired = bull.fired_on_row(d.iloc[-1])
     assert "trend" in fired
     assert set(fired) <= set(bull.SIGNAL_COLS)
+
+
+def test_cdc_fires_on_first_green_bar():
+    # down long enough for fast<slow, then a sustained rally flips fast>slow & close>fast.
+    # cdc must fire exactly on the FIRST green bar, then stay quiet while green persists.
+    down = list(np.linspace(40, 25, 120))
+    up = list(np.linspace(25, 60, 60))
+    d = bull.add_signals(_df(down + up))
+    cdc = d["cdc"]
+    assert cdc.sum() >= 1                      # the day-1 green entry fired
+    # it is an EDGE event: once green, subsequent green bars do NOT re-fire
+    fires = np.where(cdc.values)[0]
+    first = fires[0]
+    # the bar immediately after the first fire is still green (rally continues) but cdc=False
+    assert not bool(cdc.iloc[first + 1])
+
+
+def test_cdc_quiet_in_steady_downtrend():
+    d = bull.add_signals(_df(list(30 * np.exp(np.linspace(0, -0.8, 300)))))
+    assert d["cdc"].sum() == 0                 # never enters the green zone

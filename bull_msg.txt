@@ -1,17 +1,19 @@
 SET Bull Scan (2026-07-13)
 
-ตลาด: 58/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 3  brk 6  gld 1
+ตลาด: 59/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 3  brk 8  gld 1
 
-★ Q1 leader + trigger (2):
+★ Q1 leader + trigger (3):
 Ticker  sig          Buy     Stop       T1     Size
 ---------------------------------------------------
-KCE     brk        44.00    36.25    51.75      193*
-IRPC    dip         1.91     1.78     2.04   11,538
+KCE     brk        44.25    36.25    52.25      187*
+IRPC    dip         1.92     1.78     2.06   10,713
+KTB     brk        41.25    37.00    45.50      352
 
 Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
 
 วิเคราะห์:
 - ระวังยืด >10% (รอย่อ/ลดไซซ์): KCE*
+- overbought RSI≥78: KTB
 
 ★=Q1 leader  *=ยืด >10% เหนือ EMA
