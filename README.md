@@ -70,20 +70,19 @@
 
 ## Entry Signals
 
-Live default = `--entry dip_or_brk_or_cdc` — เข้าซื้อเมื่อ **ตัวใดตัวหนึ่ง** เข้าเงื่อนไข:
+Live default = `--entry dip_or_brk` — เข้าซื้อเมื่อ **ตัวใดตัวหนึ่ง** เข้าเงื่อนไข:
 
 | Signal | เงื่อนไข |
 |---|---|
 | `dip` | Pullback ลงมาที่ EMA20 ในเทรนด์ขาขึ้น + green bar + RSI≥55 + ADX≥20 + volume |
 | `breakout` | เบรก high 20 วัน ในเทรนด์ขาขึ้น + volume |
-| `cdc` | **CDC ActionZone (HAP)** — แท่งแรกที่เข้าโซนเขียว (EMA12>EMA26 & close>EMA12) = วันแรกที่เทรนด์กลับเป็นขาขึ้น |
 
-โหมดอื่น: `--entry dip` (dip อย่างเดียว), `--entry dip_or_brk` (dip หรือ breakout)
+โหมดอื่น: `--entry dip` (dip อย่างเดียว)
 
 ## Position Lifecycle
 
 ```
-BUY(dip/brk/cdc)  close >= T1 (+1R)                 close < EMA20 or stop
+BUY(dip/brk)      close >= T1 (+1R)                 close < EMA20 or stop
   │ enter FULL      │ stop → breakeven, let run       │ exit
   ▼                 ▼                                 ▼
 HOLDING/FULL ────▶ HOLDING/RUN ──────────────────▶ SELL_FLAGGED → dropped
