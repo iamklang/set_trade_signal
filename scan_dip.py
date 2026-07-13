@@ -91,11 +91,9 @@ def parse_args():
                    help="SET parallel fetch workers (default 6; lower if WAF re-challenges)")
     p.add_argument("--cache-hours", type=float, default=0,
                    help="reuse data/<SYM>.csv if younger than N hours (0=always fresh)")
-    p.add_argument("--entry", default="dip_or_brk_or_cdc",
-                   choices=["dip", "dip_or_brk", "dip_or_brk_or_cdc"],
-                   help="entry signal: dip (BUY dip only), dip_or_brk (dip OR breakout), or "
-                        "dip_or_brk_or_cdc (adds CDC ActionZone day-1 green entry — default, "
-                        "fires if ANY of dip/breakout/cdc triggers)")
+    p.add_argument("--entry", default="dip_or_brk", choices=["dip", "dip_or_brk"],
+                   help="entry signal: dip (original BUY dip only) or dip_or_brk "
+                        "(dip OR breakout — bt_weekly proved PF 1.96 Q1 vs 1.33 dip-only, default)")
     p.add_argument("--sort", default="adx", choices=["adx", "dist", "rsi"], help="sort key (desc)")
     p.add_argument("--composite", action="store_true",
                    help="rank the universe by the cross-sectional composite factor "
@@ -177,9 +175,7 @@ def main():
     a = parse_args()
     cfg = {"rsi_min": a.rsi, "adx_min": a.adx, "maxext": a.maxext,
            "need_vol_conf": not a.novol}
-    entry_sigs = {"dip": ["dip"],
-                  "dip_or_brk": ["dip", "breakout"],
-                  "dip_or_brk_or_cdc": ["dip", "breakout", "cdc"]}[a.entry]
+    entry_sigs = ["dip"] if a.entry == "dip" else ["dip", "breakout"]
     tickers = load_universe(a.universe)
     today = date.today()
     requested_date = date.fromisoformat(a.asof) if a.asof else today
@@ -371,8 +367,7 @@ def main():
     hits.sort(key=keymap[a.sort], reverse=True)
 
     # Report
-    entry_lbl = {"dip": "dip", "dip_or_brk": "dip|brk",
-                 "dip_or_brk_or_cdc": "dip|brk|cdc"}[a.entry]
+    entry_lbl = "dip" if a.entry == "dip" else "dip|brk"
     print(f"\nSET DW Swing — BUY({entry_lbl}) scan | src {a.source} | as of {asof_str} | universe {a.universe} "
           f"({len(tickers)} names) | RSI>={a.rsi} ADX>={a.adx}"
           + ("" if a.novol else " vol>avg")

@@ -8,22 +8,19 @@ just-closed daily bar and all built on setdw_signal.add_indicators so they stay 
   trend     confirmed uptrend  : close>EMA20 & EMA20 rising & EMA20>SMA200 & SMA200 rising
   breakout  N-day-high breakout: close breaks the prior BREAKOUT_LOOK-day high, in uptrend,
                                  with volume>average (a fresh continuation break)
-  cdc       CDC ActionZone buy : the FIRST bar entering the green zone (EMA_FAST>EMA_SLOW AND
-                                 close>EMA_FAST) — the day-1 trend-turns-on entry, HAP's rule
   reclaim   pullback-then-bounce: in an uptrend, close crosses back ABOVE EMA20 from at/below
   golden    trend birth        : EMA20 crosses above SMA200 (fires only on the crossover bar)
   dip       the strict swing dip: setdw_signal.buy_signal (kept as the highest-quality tag)
 
 `bull` = OR of all of the above. `trend` is deliberately broad (status, not a trigger) — filter
-to breakout/cdc/reclaim/golden/dip when you want actionable entries only.
+to breakout/reclaim/golden/dip when you want actionable entries only.
 """
 import setdw_signal as sig
 
 BREAKOUT_LOOK = 20          # prior-high lookback for the breakout trigger
-CDC_FAST, CDC_SLOW = 12, 26 # CDC ActionZone (HAP) fast/slow EMA periods (classic 12/26 on close)
 
 # order = display/priority order (most actionable first, trend/status last)
-SIGNAL_COLS = ["dip", "breakout", "cdc", "reclaim", "golden", "trend"]
+SIGNAL_COLS = ["dip", "breakout", "reclaim", "golden", "trend"]
 
 
 def add_signals(df, cfg=None):
@@ -35,13 +32,6 @@ def add_signals(df, cfg=None):
     prior_high = h.rolling(BREAKOUT_LOOK).max().shift(1)
     d["trend"] = trend
     d["breakout"] = trend & (c > prior_high) & (d["Volume"] > d["volSma"])
-    # CDC ActionZone (HAP): its own EMA12/EMA26 pair (independent of the EMA20/SMA200 the other
-    # signals share). Green zone = fast>slow AND close>fast; BUY fires only on the FIRST green
-    # bar (green & not green[1]) — the day the uptrend turns on, i.e. the "เจอวันแรก" entry.
-    fema = c.ewm(span=CDC_FAST, adjust=False).mean()
-    sema = c.ewm(span=CDC_SLOW, adjust=False).mean()
-    green = (fema > sema) & (c > fema)
-    d["cdc"] = (green & ~green.shift(1, fill_value=False)).fillna(False)
     d["reclaim"] = trend & (c > d["ema"]) & (c.shift(1) <= d["ema"].shift(1))
     d["golden"] = (d["ema"] > d["sma"]) & (d["ema"].shift(1) <= d["sma"].shift(1))
     d["dip"] = sig.buy_signal(d, cfg)
