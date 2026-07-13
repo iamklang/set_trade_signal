@@ -1,0 +1,943 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>แผน Trade — Q3/2026 Week 1</title>
+<style>
+  @font-face {
+    font-family: 'Plan';
+    src: local('SF Mono'), local('Menlo'), local('Consolas'), local('monospace');
+  }
+
+  :root {
+    --bg: #FAFAF8;
+    --bg-card: #FFFFFF;
+    --bg-row: #F5F5F3;
+    --bg-row-alt: #EBEBEA;
+    --fg: #1E1E1F;
+    --fg2: #5C5C5E;
+    --fg3: #8A8A8C;
+    --border: #D8D8D6;
+    --gold: #A67C00;
+    --gold-bg: #FFF8E1;
+    --gold-border: #E8D48B;
+    --green: #16803C;
+    --green-bg: #ECFDF5;
+    --red: #C53030;
+    --red-bg: #FFF5F5;
+    --blue: #2563EB;
+    --blue-bg: #EFF6FF;
+    --teal: #0D7377;
+    --teal-bg: #F0FDFA;
+    --accent: #B8860B;
+    --ribbon: #1C1F26;
+    --ribbon-fg: #E5E5E3;
+    --ribbon-muted: #9CA3AF;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111318;
+      --bg-card: #1A1D24;
+      --bg-row: #1E2128;
+      --bg-row-alt: #252830;
+      --fg: #E5E5E3;
+      --fg2: #9CA3AF;
+      --fg3: #6B7280;
+      --border: #2E3138;
+      --gold: #D4A853;
+      --gold-bg: #2A2415;
+      --gold-border: #554A2A;
+      --green: #34D399;
+      --green-bg: #0D2818;
+      --red: #F87171;
+      --red-bg: #2D1515;
+      --blue: #60A5FA;
+      --blue-bg: #172038;
+      --teal: #2DD4BF;
+      --teal-bg: #0D2D2D;
+      --accent: #D4A853;
+      --ribbon: #0D0F13;
+      --ribbon-fg: #E5E5E3;
+      --ribbon-muted: #6B7280;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111318;
+    --bg-card: #1A1D24;
+    --bg-row: #1E2128;
+    --bg-row-alt: #252830;
+    --fg: #E5E5E3;
+    --fg2: #9CA3AF;
+    --fg3: #6B7280;
+    --border: #2E3138;
+    --gold: #D4A853;
+    --gold-bg: #2A2415;
+    --gold-border: #554A2A;
+    --green: #34D399;
+    --green-bg: #0D2818;
+    --red: #F87171;
+    --red-bg: #2D1515;
+    --blue: #60A5FA;
+    --blue-bg: #172038;
+    --teal: #2DD4BF;
+    --teal-bg: #0D2D2D;
+    --accent: #D4A853;
+    --ribbon: #0D0F13;
+    --ribbon-fg: #E5E5E3;
+    --ribbon-muted: #6B7280;
+  }
+  :root[data-theme="light"] {
+    --bg: #FAFAF8;
+    --bg-card: #FFFFFF;
+    --bg-row: #F5F5F3;
+    --bg-row-alt: #EBEBEA;
+    --fg: #1E1E1F;
+    --fg2: #5C5C5E;
+    --fg3: #8A8A8C;
+    --border: #D8D8D6;
+    --gold: #A67C00;
+    --gold-bg: #FFF8E1;
+    --gold-border: #E8D48B;
+    --green: #16803C;
+    --green-bg: #ECFDF5;
+    --red: #C53030;
+    --red-bg: #FFF5F5;
+    --blue: #2563EB;
+    --blue-bg: #EFF6FF;
+    --teal: #0D7377;
+    --teal-bg: #F0FDFA;
+    --accent: #B8860B;
+    --ribbon: #1C1F26;
+    --ribbon-fg: #E5E5E3;
+    --ribbon-muted: #9CA3AF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    padding: 0;
+  }
+
+  .ribbon {
+    background: var(--ribbon);
+    color: var(--ribbon-fg);
+    padding: 14px 24px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: baseline;
+    border-bottom: 2px solid var(--accent);
+  }
+  .ribbon-title {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-right: auto;
+  }
+  .ribbon-stat {
+    font-family: 'Plan', 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 13px;
+    color: var(--ribbon-muted);
+  }
+  .ribbon-stat b {
+    color: var(--ribbon-fg);
+    font-weight: 600;
+  }
+
+  .container {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 20px 48px;
+  }
+
+  .note-box {
+    background: var(--gold-bg);
+    border: 1px solid var(--gold-border);
+    border-left: 3px solid var(--gold);
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 28px;
+    font-size: 13px;
+    color: var(--fg2);
+    line-height: 1.6;
+  }
+  .note-box strong { color: var(--fg); }
+
+  .section {
+    margin-bottom: 32px;
+  }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .section-icon.dip { background: var(--teal-bg); color: var(--teal); }
+  .section-icon.brk { background: var(--blue-bg); color: var(--blue); }
+  .section-icon.alloc { background: var(--green-bg); color: var(--green); }
+  .section-icon.risk { background: var(--red-bg); color: var(--red); }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .section-count {
+    font-size: 12px;
+    color: var(--fg3);
+    font-weight: 400;
+  }
+
+  .trade-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    min-width: 700px;
+  }
+  thead th {
+    background: var(--bg-row);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg3);
+    padding: 8px 10px;
+    text-align: right;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+  }
+  thead th:first-child { text-align: left; }
+  thead th:nth-child(2) { text-align: center; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:nth-child(even) { background: var(--bg-row); }
+  tbody tr:nth-child(odd) { background: var(--bg-card); }
+  tbody tr.priority-row { background: var(--gold-bg); }
+
+  td {
+    padding: 9px 10px;
+    text-align: right;
+    font-family: 'Plan', 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  td:first-child {
+    text-align: left;
+    font-weight: 700;
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: 13px;
+  }
+  td:nth-child(2) { text-align: center; }
+
+  .q-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+  .q-badge.q1 { background: var(--gold-bg); color: var(--gold); border: 1px solid var(--gold-border); }
+  .q-badge.q2 { background: var(--blue-bg); color: var(--blue); border: 1px solid transparent; }
+  .q-badge.q4 { background: var(--bg-row); color: var(--fg3); border: 1px solid var(--border); }
+
+  .signal-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 5px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .signal-tag.dip { background: var(--teal-bg); color: var(--teal); }
+  .signal-tag.brk { background: var(--blue-bg); color: var(--blue); }
+
+  .price-stop { color: var(--red); }
+  .price-t1 { color: var(--green); }
+
+  .alloc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 600px) {
+    .alloc-grid { grid-template-columns: 1fr; }
+  }
+  .alloc-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .alloc-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fg3);
+    margin-bottom: 4px;
+  }
+  .alloc-card-value {
+    font-family: 'Plan', 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .alloc-card-sub {
+    font-size: 12px;
+    color: var(--fg2);
+    margin-top: 2px;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .bar-label {
+    font-size: 12px;
+    font-weight: 600;
+    width: 70px;
+    flex-shrink: 0;
+  }
+  .bar-track {
+    flex: 1;
+    height: 18px;
+    background: var(--bg-row);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.3s;
+  }
+  .bar-fill.gold { background: var(--gold); opacity: 0.7; }
+  .bar-fill.blue { background: var(--blue); opacity: 0.6; }
+  .bar-fill.cash { background: var(--fg3); opacity: 0.3; }
+  .bar-pct {
+    font-family: 'Plan', 'SF Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    color: var(--fg2);
+    width: 48px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .summary-table td {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  }
+  .summary-table td:first-child {
+    font-weight: 400;
+    color: var(--fg2);
+    width: 55%;
+  }
+  .summary-table td:last-child {
+    text-align: right;
+    font-family: 'Plan', 'SF Mono', Menlo, Consolas, monospace;
+    font-weight: 600;
+  }
+  .summary-table tr:last-child td { border-bottom: none; }
+
+  .risk-meter {
+    margin-top: 16px;
+  }
+  .risk-bar-track {
+    width: 100%;
+    height: 24px;
+    background: var(--bg-row);
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  .risk-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green), var(--gold), var(--red));
+    border-radius: 6px;
+    opacity: 0.6;
+  }
+  .risk-marker {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    width: 3px;
+    background: var(--fg);
+    border-radius: 2px;
+  }
+  .risk-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--fg3);
+    margin-top: 4px;
+  }
+
+  .footer-note {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--fg3);
+    line-height: 1.7;
+  }
+
+  .priority-star {
+    color: var(--gold);
+    font-size: 11px;
+  }
+
+  .plan-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .plan-section h4 {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .plan-section p, .plan-section li {
+    font-size: 13px;
+    color: var(--fg2);
+    line-height: 1.6;
+  }
+  .plan-section ul {
+    padding-left: 18px;
+  }
+  .plan-section li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<div class="ribbon">
+  <span class="ribbon-title">Trade Plan — Q3/2026 Wk1</span>
+  <span class="ribbon-stat">Equity <b>100,000</b></span>
+  <span class="ribbon-stat">Risk/trade <b>1%</b> = <b>1,000 &#3647;</b></span>
+  <span class="ribbon-stat">Max pos <b>12</b></span>
+  <span class="ribbon-stat">Exposure <b>1.0</b></span>
+  <span class="ribbon-stat">DD budget <b>-8%</b></span>
+</div>
+
+<div class="container">
+
+  <div class="note-box">
+    <strong>asof 10 ก.ค. 2569</strong> — ข้อมูลแท่งปิดวันศุกร์ ไตรมาส Q3 เพิ่งเริ่ม book ว่างเปล่า<br>
+    ด้านล่างคือสัญญาณทั้งหมดที่ระบบสแกนได้ พร้อม sizing ที่คำนวณจากทุน 100k จริง (equity&#215;1%&#247;riskU &#215; quintile tilt &#215; regime 1.0)
+    เข้าเฉพาะเมื่อ <strong>volume ยืนยัน</strong>วันจันทร์ — ไม่ chase gap-up
+  </div>
+
+  <!-- ====== VALIDATED DIP SIGNALS ====== -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon dip">D</div>
+      <div>
+        <span class="section-title">Validated Dip Signals</span>
+        <span class="section-count"> — สัญญาณ dip/breakout ยืนยันแล้ว รอ green bar + volume เท่านั้น</span>
+      </div>
+    </div>
+    <div class="trade-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Q</th>
+            <th>Buy</th>
+            <th>Stop</th>
+            <th>Risk/U</th>
+            <th>T1 (+1R)</th>
+            <th>T2 (+1.5R)</th>
+            <th>Size</th>
+            <th>Capital</th>
+            <th>Risk &#3647;</th>
+            <th>RSI</th>
+            <th>ADX</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="priority-row">
+            <td>STECON <span class="priority-star">&#9733;</span></td>
+            <td><span class="q-badge q1">Q1</span></td>
+            <td>18.80</td>
+            <td class="price-stop">17.40</td>
+            <td>1.40</td>
+            <td class="price-t1">20.20</td>
+            <td>20.90</td>
+            <td>1,071</td>
+            <td>20,135</td>
+            <td>1,499</td>
+            <td>65</td>
+            <td>39</td>
+          </tr>
+          <tr class="priority-row">
+            <td>AMATA <span class="priority-star">&#9733;</span></td>
+            <td><span class="q-badge q1">Q1</span></td>
+            <td>28.50</td>
+            <td class="price-stop">25.25</td>
+            <td>3.25</td>
+            <td class="price-t1">31.75</td>
+            <td>33.38</td>
+            <td>460</td>
+            <td>13,110</td>
+            <td>1,495</td>
+            <td>67</td>
+            <td>33</td>
+          </tr>
+          <tr class="priority-row">
+            <td>WHA <span class="priority-star">&#9733;</span></td>
+            <td><span class="q-badge q1">Q1</span></td>
+            <td>5.45</td>
+            <td class="price-stop">4.96</td>
+            <td>0.49</td>
+            <td class="price-t1">5.94</td>
+            <td>6.19</td>
+            <td>3,060</td>
+            <td>16,677</td>
+            <td>1,499</td>
+            <td>68</td>
+            <td>33</td>
+          </tr>
+          <tr class="priority-row">
+            <td>JMART <span class="priority-star">&#9733;</span></td>
+            <td><span class="q-badge q1">Q1</span></td>
+            <td>12.30</td>
+            <td class="price-stop">9.10</td>
+            <td>3.20</td>
+            <td class="price-t1">15.50</td>
+            <td>17.10</td>
+            <td>468</td>
+            <td>5,756</td>
+            <td>1,498</td>
+            <td>78</td>
+            <td>36</td>
+          </tr>
+          <tr>
+            <td>BA</td>
+            <td><span class="q-badge q2">Q2</span></td>
+            <td>19.00</td>
+            <td class="price-stop">17.00</td>
+            <td>2.00</td>
+            <td class="price-t1">21.00</td>
+            <td>22.00</td>
+            <td>625</td>
+            <td>11,875</td>
+            <td>1,250</td>
+            <td>64</td>
+            <td>38</td>
+          </tr>
+          <tr>
+            <td>COM7</td>
+            <td><span class="q-badge q2">Q2</span></td>
+            <td>29.50</td>
+            <td class="price-stop">26.75</td>
+            <td>2.75</td>
+            <td class="price-t1">32.25</td>
+            <td>33.63</td>
+            <td>453</td>
+            <td>13,364</td>
+            <td>1,246</td>
+            <td>65</td>
+            <td>37</td>
+          </tr>
+          <tr>
+            <td>SCC</td>
+            <td><span class="q-badge q2">Q2</span></td>
+            <td>245.00</td>
+            <td class="price-stop">235.00</td>
+            <td>10.00</td>
+            <td class="price-t1">255.00</td>
+            <td>260.00</td>
+            <td>125</td>
+            <td>30,625</td>
+            <td>1,250</td>
+            <td>58</td>
+            <td>23</td>
+          </tr>
+          <tr>
+            <td>QH</td>
+            <td><span class="q-badge q4">Q4</span></td>
+            <td>1.39</td>
+            <td class="price-stop">1.35</td>
+            <td>0.04</td>
+            <td class="price-t1">1.43</td>
+            <td>1.45</td>
+            <td>18,750</td>
+            <td>26,063</td>
+            <td>750</td>
+            <td>60</td>
+            <td>26</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ====== BREAKOUT READY ====== -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon brk">B</div>
+      <div>
+        <span class="section-title">Breakout Ready</span>
+        <span class="section-count"> — ใกล้ทะลุ high มาก รอ breakout + volume ยืนยัน</span>
+      </div>
+    </div>
+    <div class="trade-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Q</th>
+            <th>Close</th>
+            <th>Breakout &gt;</th>
+            <th>ห่าง</th>
+            <th>Stop</th>
+            <th>Risk/U</th>
+            <th>T1</th>
+            <th>Size</th>
+            <th>Capital</th>
+            <th>Risk &#3647;</th>
+            <th>RSI</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="priority-row">
+            <td>KCE <span class="priority-star">&#9733;</span></td>
+            <td><span class="q-badge q1">Q1</span></td>
+            <td>42.50</td>
+            <td>42.50</td>
+            <td>at hi</td>
+            <td class="price-stop">36.25</td>
+            <td>6.25</td>
+            <td class="price-t1">48.75</td>
+            <td>240</td>
+            <td>10,200</td>
+            <td>1,500</td>
+            <td>61</td>
+          </tr>
+          <tr class="priority-row">
+            <td>GUNKUL <span class="priority-star">&#9733;</span></td>
+            <td><span class="q-badge q1">Q1</span></td>
+            <td>4.80</td>
+            <td>4.88</td>
+            <td>+1.7%</td>
+            <td class="price-stop">4.16</td>
+            <td>0.64</td>
+            <td class="price-t1">5.44</td>
+            <td>2,343</td>
+            <td>11,246</td>
+            <td>1,500</td>
+            <td>81</td>
+          </tr>
+          <tr class="priority-row">
+            <td>BGRIM <span class="priority-star">&#9733;</span></td>
+            <td><span class="q-badge q1">Q1</span></td>
+            <td>19.60</td>
+            <td>19.50</td>
+            <td>at hi</td>
+            <td class="price-stop">16.50</td>
+            <td>3.10</td>
+            <td class="price-t1">22.70</td>
+            <td>483</td>
+            <td>9,467</td>
+            <td>1,497</td>
+            <td>80</td>
+          </tr>
+          <tr>
+            <td>GPSC</td>
+            <td><span class="q-badge q2">Q2</span></td>
+            <td>49.25</td>
+            <td>48.75</td>
+            <td>at hi</td>
+            <td class="price-stop">42.75</td>
+            <td>6.50</td>
+            <td class="price-t1">55.75</td>
+            <td>191</td>
+            <td>9,407</td>
+            <td>1,242</td>
+            <td>76</td>
+          </tr>
+          <tr>
+            <td>RATCH</td>
+            <td><span class="q-badge q2">Q2</span></td>
+            <td>36.25</td>
+            <td>35.75</td>
+            <td>at hi</td>
+            <td class="price-stop">30.75</td>
+            <td>5.50</td>
+            <td class="price-t1">41.75</td>
+            <td>226</td>
+            <td>8,193</td>
+            <td>1,243</td>
+            <td>80</td>
+          </tr>
+          <tr>
+            <td>BBL</td>
+            <td><span class="q-badge q2">Q2</span></td>
+            <td>196.50</td>
+            <td>197.00</td>
+            <td>+0.3%</td>
+            <td class="price-stop">175.00</td>
+            <td>21.50</td>
+            <td class="price-t1">218.00</td>
+            <td>57</td>
+            <td>11,201</td>
+            <td>1,226</td>
+            <td>75</td>
+          </tr>
+          <tr>
+            <td>KBANK</td>
+            <td><span class="q-badge q2">Q2</span></td>
+            <td>232.00</td>
+            <td>234.00</td>
+            <td>+0.9%</td>
+            <td class="price-stop">213.00</td>
+            <td>19.00</td>
+            <td class="price-t1">251.00</td>
+            <td>65</td>
+            <td>15,080</td>
+            <td>1,235</td>
+            <td>75</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ====== RECOMMENDED ALLOCATION ====== -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon alloc">$</div>
+      <div>
+        <span class="section-title">แผนจัดสรรเงินแนะนำ</span>
+        <span class="section-count"> — จาก 100,000 &#3647; จริง (Q1 ก่อน, dip ยืนยันก่อน brk)</span>
+      </div>
+    </div>
+
+    <div class="alloc-grid">
+      <div class="alloc-card">
+        <div class="alloc-card-label">เข้าได้สูงสุด</div>
+        <div class="alloc-card-value">5 <span style="font-size:14px;font-weight:400;color:var(--fg2)">positions</span></div>
+        <div class="alloc-card-sub">จาก max 12 — จำกัดด้วย DD budget ไม่ใช่จำนวนตัว</div>
+      </div>
+      <div class="alloc-card">
+        <div class="alloc-card-label">ทุนใช้ / สำรอง</div>
+        <div class="alloc-card-value" style="color:var(--green)">67,553 <span style="font-size:14px;font-weight:400;color:var(--fg2)">/ 32,447</span></div>
+        <div class="alloc-card-sub">ใช้ 68% ของพอร์ต เหลือ cash buffer 32%</div>
+      </div>
+      <div class="alloc-card">
+        <div class="alloc-card-label">Total risk ถ้า stop ทุกตัวพร้อมกัน</div>
+        <div class="alloc-card-value" style="color:var(--red)">-7,241 &#3647;</div>
+        <div class="alloc-card-sub">-7.2% ของ equity — อยู่ใน -8% budget</div>
+      </div>
+      <div class="alloc-card">
+        <div class="alloc-card-label">Buffer ก่อน breaker</div>
+        <div class="alloc-card-value" style="color:var(--green)">759 &#3647;</div>
+        <div class="alloc-card-sub">เหลือ 0.8% ก่อนชน -8% circuit-breaker</div>
+      </div>
+    </div>
+
+    <div class="plan-section">
+      <h4 style="color:var(--gold)">Tier 1 — Q1 Dip (ยืนยันแล้ว, เข้าก่อน)</h4>
+      <div class="trade-table-wrap" style="margin-top:8px">
+        <table>
+          <thead><tr><th>Ticker</th><th>Q</th><th>Signal</th><th>Buy</th><th>Stop</th><th>T1</th><th>Size</th><th>Capital</th><th>Risk &#3647;</th></tr></thead>
+          <tbody>
+            <tr><td>STECON</td><td><span class="q-badge q1">Q1</span></td><td><span class="signal-tag dip">DIP</span></td><td>18.80</td><td class="price-stop">17.40</td><td class="price-t1">20.20</td><td>1,071</td><td>20,135</td><td>1,499</td></tr>
+            <tr><td>AMATA</td><td><span class="q-badge q1">Q1</span></td><td><span class="signal-tag dip">DIP</span></td><td>28.50</td><td class="price-stop">25.25</td><td class="price-t1">31.75</td><td>460</td><td>13,110</td><td>1,495</td></tr>
+            <tr><td>WHA</td><td><span class="q-badge q1">Q1</span></td><td><span class="signal-tag dip">DIP</span></td><td>5.45</td><td class="price-stop">4.96</td><td class="price-t1">5.94</td><td>3,060</td><td>16,677</td><td>1,499</td></tr>
+            <tr><td>JMART</td><td><span class="q-badge q1">Q1</span></td><td><span class="signal-tag dip">DIP</span></td><td>12.30</td><td class="price-stop">9.10</td><td class="price-t1">15.50</td><td>468</td><td>5,756</td><td>1,498</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:8px"><strong>ทุนรวม Tier 1:</strong> 55,678 &#3647; &nbsp; <strong>Risk:</strong> 5,991 &#3647; (6.0%)</p>
+    </div>
+
+    <div class="plan-section">
+      <h4 style="color:var(--blue)">Tier 2 — Q2 Dip (เสริม 1 ตัว)</h4>
+      <div class="trade-table-wrap" style="margin-top:8px">
+        <table>
+          <thead><tr><th>Ticker</th><th>Q</th><th>Signal</th><th>Buy</th><th>Stop</th><th>T1</th><th>Size</th><th>Capital</th><th>Risk &#3647;</th></tr></thead>
+          <tbody>
+            <tr><td>BA</td><td><span class="q-badge q2">Q2</span></td><td><span class="signal-tag dip">DIP</span></td><td>19.00</td><td class="price-stop">17.00</td><td class="price-t1">21.00</td><td>625</td><td>11,875</td><td>1,250</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:8px"><strong>ทุนรวม Tier 1+2:</strong> 67,553 &#3647; &nbsp; <strong>Risk:</strong> 7,241 &#3647; (7.2%) &nbsp;— <span style="color:var(--green)">อยู่ใน budget</span></p>
+    </div>
+
+    <div class="plan-section">
+      <h4 style="color:var(--fg3)">Tier 3 — ถ้ามี Breakout ยืนยัน (เลือก 1 จาก Q1 แทน BA)</h4>
+      <div class="trade-table-wrap" style="margin-top:8px">
+        <table>
+          <thead><tr><th>Ticker</th><th>Q</th><th>Signal</th><th>Buy</th><th>Stop</th><th>T1</th><th>Size</th><th>Capital</th><th>Risk &#3647;</th></tr></thead>
+          <tbody>
+            <tr><td>KCE</td><td><span class="q-badge q1">Q1</span></td><td><span class="signal-tag brk">BRK</span></td><td>42.50</td><td class="price-stop">36.25</td><td class="price-t1">48.75</td><td>240</td><td>10,200</td><td>1,500</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:8px"><strong>ถ้าเปลี่ยน BA → KCE:</strong> 65,878 &#3647; &nbsp; <strong>Risk:</strong> 7,491 &#3647; (7.5%) &nbsp;— <span style="color:var(--green)">อยู่ใน budget</span></p>
+      <p>ถ้าเข้าทั้ง BA + KCE (6 ตัว) → risk 8,741 &#3647; (8.7%) <span style="color:var(--red)">เกิน budget</span> ต้อง<strong>ตัด 1 ตัว</strong></p>
+    </div>
+
+    <!-- Capital bar -->
+    <div style="margin-top:20px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--fg2)">Capital Allocation (แผน 5 ตัว ที่แนะนำ)</div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--gold)">Q1 dip</span>
+        <div class="bar-track"><div class="bar-fill gold" style="width:56%"></div></div>
+        <span class="bar-pct">55,678</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--blue)">Q2 dip</span>
+        <div class="bar-track"><div class="bar-fill blue" style="width:12%"></div></div>
+        <span class="bar-pct">11,875</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label" style="color:var(--fg3)">Cash</span>
+        <div class="bar-track"><div class="bar-fill cash" style="width:32%"></div></div>
+        <span class="bar-pct">32,447</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== RISK ANALYSIS ====== -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon risk">!</div>
+      <div>
+        <span class="section-title">Risk Analysis</span>
+      </div>
+    </div>
+
+    <table class="summary-table">
+      <tr><td>Total risk ถ้า stop ทุกตัว (5 pos)</td><td style="color:var(--red)">-7,241 &#3647; (-7.2%)</td></tr>
+      <tr><td>DD circuit-breaker</td><td>-8,000 &#3647; (-8.0%)</td></tr>
+      <tr><td>Buffer ก่อน breaker</td><td style="color:var(--green)">759 &#3647; (0.8%)</td></tr>
+      <tr><td>Risk / position เฉลี่ย</td><td>1,448 &#3647; (1.4%)</td></tr>
+      <tr><td>Max single-position risk</td><td>1,499 &#3647; (1.5%) — Q1 tilt</td></tr>
+      <tr><td>Exposure factor (voltgt &#215; ddbrake)</td><td style="color:var(--green)">1.0 (ปกติ)</td></tr>
+      <tr><td>Cash reserve หลังเข้าครบ</td><td>32,447 &#3647; (32%)</td></tr>
+    </table>
+
+    <div class="risk-meter">
+      <div style="font-size:11px;color:var(--fg3);margin-bottom:4px">Quarter Drawdown Budget</div>
+      <div class="risk-bar-track">
+        <div class="risk-bar-fill" style="width:100%"></div>
+        <div class="risk-marker" style="left:0%" title="ตอนนี้: 0%"></div>
+        <div class="risk-marker" style="left:90%;background:var(--red);width:2px" title="Worst-case: -7.2%"></div>
+      </div>
+      <div class="risk-label">
+        <span>0% (ตอนนี้)</span>
+        <span style="color:var(--red)">-7.2% worst</span>
+        <span>-8% breaker</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== EXECUTION PLAN ====== -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-icon alloc">&#10003;</div>
+      <div>
+        <span class="section-title">แผนปฏิบัติวันจันทร์ 14 ก.ค.</span>
+      </div>
+    </div>
+
+    <div class="plan-section">
+      <h4>ก่อนตลาดเปิด (09:00)</h4>
+      <ul>
+        <li>ตั้ง limit buy ที่ราคา signal-bar close หรือต่ำกว่า — <strong>ไม่ chase gap-up</strong></li>
+        <li>ถ้า gap-up เกิน 1% จากราคา buy → ข้ามไป เพราะ R-multiple เพี้ยน</li>
+        <li>ตั้ง stop-loss ทันทีที่ fill</li>
+      </ul>
+    </div>
+
+    <div class="plan-section">
+      <h4>ลำดับเข้า (Q1 ก่อน)</h4>
+      <ul>
+        <li><strong>1. STECON</strong> @ 18.80 — composite สูงสุด (3.00), ADX 39 trend แข็ง, 1,071 หุ้น</li>
+        <li><strong>2. AMATA</strong> @ 28.50 — composite 1.63, dip+brk ซ้อนกัน, 460 หุ้น</li>
+        <li><strong>3. WHA</strong> @ 5.45 — composite 0.86, dip+brk ซ้อนกัน, 3,060 หุ้น</li>
+        <li><strong>4. JMART</strong> @ 12.30 — Q1 (ขึ้นจาก Q2), dip+brk ซ้อนกัน, 468 หุ้น</li>
+        <li><strong>5. BA</strong> @ 19.00 — Q2, ADX 38 trend แข็ง, 625 หุ้น</li>
+      </ul>
+    </div>
+
+    <div class="plan-section">
+      <h4>Exit Rules (V5 let-winners-run)</h4>
+      <ul>
+        <li>Hit T1 (+1R) → ย้าย stop ขึ้นมา breakeven แล้ว trail EMA20</li>
+        <li>ไม่มี profit cap — ให้วิ่งจนหลุด EMA20</li>
+        <li>Stop ก่อน T1 = ตัดทันที ไม่รอ</li>
+        <li>Cooldown 5 bars หลัง exit ก่อนเข้าตัวเดิมอีก</li>
+      </ul>
+    </div>
+
+    <div class="plan-section">
+      <h4>ตัวที่ไม่เข้ารอบนี้ (ทำไม)</h4>
+      <ul>
+        <li><strong>COM7</strong> — Q2 dip+brk ดี แต่ capital 13k ใหญ่ เข้าเพิ่มจะเกิน risk budget</li>
+        <li><strong>SCC</strong> — capital 30,625 &#3647; ใหญ่เกินไปเทียบกับ edge (RSI 58, ADX 23 ยังอ่อน)</li>
+        <li><strong>QH</strong> — Q4 (tilt 0.75&#215;), riskU แค่ 0.04 &#3647; (stop แน่นมาก แทบไม่มีที่หายใจ)</li>
+        <li><strong>GUNKUL</strong> — RSI 81 overextended, รอ pullback ดีกว่า</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-note">
+    Size คำนวณจาก equity 100,000 &#3647; &#215; risk 1% &#247; riskU &#215; quintile tilt (Q1=1.5&#215;, Q2=1.25&#215;) &#215; regime 1.0<br>
+    Board lot SET = 100 หุ้น — ปัดลง nearest 100 ก่อนส่งคำสั่งจริง (เช่น STECON 1,071→1,000, WHA 3,060→3,000)<br>
+    ถ้าเทรด DW แทนหุ้นอ้างอิง ต้องแปลง delta/gearing ก่อน — plan นี้คือ underlying exposure<br>
+    ไม่ใช่คำแนะนำการลงทุน — checklist สำหรับระบบ DW Swing ส่วนตัวเท่านั้น
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -61,7 +61,7 @@ def fetch_yahoo(t, period="2y"):
 def parse_args():
     p = argparse.ArgumentParser(description="SET broad bullish-signal scanner")
     p.add_argument("--universe", default=os.path.join(HERE, "set100.bk.txt"))
-    p.add_argument("--equity", type=float, default=1_000_000)
+    p.add_argument("--equity", type=float, default=100_000)
     p.add_argument("--risk", type=float, default=1.0)
     p.add_argument("--signals", default="all",
                    help="comma list to require (any-of) from dip,breakout,reclaim,golden,trend; "
