@@ -1,14 +1,14 @@
 {
-  "asof": "2026-07-13",
+  "asof": "2026-07-14",
   "factor": 1.0,
   "voltgt": 1.0,
   "ddbrake": 1.0,
-  "mkt_vol": 0.1688,
-  "dd": -0.0119,
-  "equity": 98814.0,
+  "mkt_vol": 0.1707,
+  "dd": -0.0023,
+  "equity": 99766.0,
   "peak": 100000.0,
   "risk_off": false,
-  "index": 1.1695,
-  "sma": 0.9736,
+  "index": 1.1656,
+  "sma": 0.9747,
   "brake_enabled": true
 }
