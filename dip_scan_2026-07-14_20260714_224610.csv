@@ -1,0 +1,7 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+PTTEP.BK,144.0,144.0,130.0,14.0,158.0,165.0,0,4.8661,63.2396,27.4238,breakout,-0.147,0,1.0,1.0,3,False,no-fresh-dip,2026-07-14 22:46
+ADVANC.BK,382.0,382.0,362.0,20.0,402.0,412.0,0,3.6058,66.3279,26.5975,dip|breakout,-0.0,0,1.25,1.0,2,True,confirmed,2026-07-14 22:46
+KCE.BK,45.0,45.0,36.25,8.75,53.75,58.125,0,12.4229,65.4863,24.0183,breakout,2.074,0,1.5,1.0,1,False,no-fresh-dip,2026-07-14 22:46
+STA.BK,18.8,18.8,16.7,2.1,20.9,21.95,200,5.2193,60.7264,23.4762,dip,0.522,200,1.25,1.0,2,True,confirmed,2026-07-14 22:46
+PTT.BK,38.25,38.25,35.25,3.0,41.25,42.75,200,4.6481,69.2644,19.3657,breakout,-0.194,200,1.0,1.0,3,False,"no-fresh-dip, adx 19<20",2026-07-14 22:46
+BANPU.BK,5.8,5.8,5.35,0.45,6.25,6.475,1300,4.1047,66.2716,19.006,breakout,-0.158,1300,1.0,1.0,3,False,adx 19<20,2026-07-14 22:46
