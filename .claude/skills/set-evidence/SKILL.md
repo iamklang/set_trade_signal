@@ -94,8 +94,10 @@ no-overfit, sitting through losers) matters more than adding cleverness.
 | `bt_portfolio.py` | Portfolio-level: sizing, cap sweep, cost models |
 | `bt_exits.py` | Exit rules comparison (V1-V5) |
 | `bt_composite.py` | Walk-forward quintile test |
+| `bt_weekly.py` | 1-week horizon: V5 vs weekly variants |
 | `bt_triggers.py` | Bull-scan triggers vs strict BUY(dip) |
 | `bt_holdout.py` | Time-split holdout: overfitting check |
+| `bt_quality.py` | ROE quality factor improvement test |
 
 ## When to use
 

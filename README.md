@@ -132,6 +132,32 @@ HOLDING/FULL ────▶ HOLDING/RUN ─────────────
 | `trade_log.py` | Manual execution ledger (plan vs actual) |
 | `housekeeping.py` | Log/CSV retention cleanup |
 
+## Claude Code Skills
+
+Slash commands สำหรับใช้ใน Claude Code — แต่ละ skill โหลดเฉพาะส่วนที่เกี่ยวข้อง:
+
+| Skill | ใช้เมื่อ |
+|---|---|
+| `/set-dw-swing` | Master index — คำถามกว้างๆ หรือ full workflow |
+| `/set-macro` | Macro regime, index trend, sector leadership ("ใครแบก") |
+| `/set-entry` | Chart plan, entry/stop/target สำหรับหุ้นเฉพาะตัว |
+| `/set-earnings` | งบ season: consensus, sell-on-fact, SC, IV crush |
+| `/set-dw` | เลือก DW series: delta, effective gearing, IV, expiry |
+| `/set-risk` | Sizing (lot 100), exits, lifecycle, position cap, rotation |
+| `/set-evidence` | Backtest results, อะไรผ่าน/ไม่ผ่าน, limitations |
+
+Skills อยู่ที่ `.claude/skills/set-*/SKILL.md`
+
+## Agents
+
+| Agent | ใช้เมื่อ |
+|---|---|
+| `morning-ready` | Pre-market readiness check (ก่อน SET เปิด) |
+| `eod-monitor` | End-of-day monitoring (หลัง SET ปิด) |
+| `quarter-review` | Quarterly review (สิ้นไตรมาส) |
+
+Agents อยู่ที่ `.claude/agents/*.md`
+
 ## Tests
 
 ```bash

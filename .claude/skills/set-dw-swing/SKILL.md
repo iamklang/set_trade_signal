@@ -74,6 +74,19 @@ Two companion scripts in the project root:
 | `costs.py` | SET cost model (tick-based spread + commission) |
 | `set_data.py` | Data: SET official (Playwright) or Yahoo Finance |
 | `composite.py` | Multi-factor ranking (momentum + trend) |
+| `line_notify.py` | LINE Messaging API push notifications |
+| `trade_dashboard.py` | Web dashboard: signals, holdings, plan vs actual |
+| `quarterly_review.py` | Quarter-end review: expectancy, PF, max DD |
+| `collect_nvdr.py` | NVDR (foreign flow) daily data collection |
+| `trade_log.py` | Manual execution ledger (plan vs actual) |
+
+## Claude Code agents
+
+| Agent | When |
+|---|---|
+| `morning-ready` | Pre-market readiness check (ก่อน SET เปิด) |
+| `eod-monitor` | End-of-day monitoring (หลัง SET ปิด) |
+| `quarter-review` | Quarterly review (สิ้นไตรมาส) |
 
 ## Sources
 
