@@ -110,14 +110,15 @@
     "signals": [
       "breakout"
     ],
-    "size": 0,
+    "size": 100,
     "size_mult": 1.25,
     "state": "HOLDING",
     "status": "HOLD",
     "stop": 45.5,
     "t1": 58.5,
     "t1_date": null,
-    "t2": 61.75
+    "t2": 61.75,
+    "size_base": 100
   },
   "GUNKUL.BK": {
     "adx": 56.0,
@@ -318,14 +319,15 @@
     "signals": [
       "breakout"
     ],
-    "size": 0,
+    "size": 100,
     "size_mult": 1.25,
     "state": "HOLDING",
     "status": "HOLD",
     "stop": 31.75,
     "t1": 43.75,
     "t1_date": null,
-    "t2": 46.75
+    "t2": 46.75,
+    "size_base": 100
   },
   "SPRC.BK": {
     "adx": 35.0,
@@ -405,14 +407,15 @@
     "signals": [
       "breakout"
     ],
-    "size": 0,
+    "size": 100,
     "size_mult": 1.25,
     "state": "HOLDING",
     "status": "HOLD",
     "stop": 48.5,
     "t1": 64.5,
     "t1_date": null,
-    "t2": 68.5
+    "t2": 68.5,
+    "size_base": 100
   },
   "TTB.BK": {
     "adx": 52.0,
