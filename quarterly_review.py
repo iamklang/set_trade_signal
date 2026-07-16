@@ -261,72 +261,102 @@ def _fmt_baht(x):
     return f"{x:+,.0f}"
 
 
-def print_report(quarter, trades, opens, cost_label, budget=None):
-    print(f"\n{'='*66}")
-    print(f"  Q-CLOSE REVIEW — {quarter}   (P/L {cost_label})")
-    print(f"{'='*66}\n")
+def _pf_ok(pf):
+    """Profit factor meets the ≥1.9 target (∞ = only-winners counts as pass)."""
+    return pf is not None and (pf == float("inf") or pf >= 1.9)
 
-    if budget and budget.get("quarter") == quarter:
-        bs = budget_status(budget, trades, opens)
-        print(f"  RISK BUDGET (Q-Open {budget.get('start_date','')})")
-        print(f"       equity {float(budget.get('start_equity',0)):,.0f} ฿  |  "
-              f"risk {budget.get('risk_per_trade_pct','?')}%/ไม้  |  "
-              f"max {budget.get('max_positions','?')} ตัว  |  "
-              f"DD limit -{budget.get('max_drawdown_pct','?')}%")
-        gauge = "🔴 BREACH — ลด size ครึ่ง (regime brake)" if bs["breached"] else "🟢 within budget"
-        print(f"       P/L ไตรมาส {_fmt_baht(bs['total'])} ฿  "
-              f"(realized {_fmt_baht(bs['realized'])} + open {_fmt_baht(bs['unrealized'])})  "
-              f"= {bs['dd_pct']:+.2f}%   {gauge}")
-        print()
 
+def build_analysis(quarter, trades, opens, cost_label, budget=None):
+    """Analytical Q-Close brief (same style as the morning/EOD briefs): a verdict, the risk-budget
+    gauge, the edge metrics vs their targets, which entry signal actually makes the money, open-book
+    context, and an action line — the distilled decision rather than a raw metrics dump."""
     m = metrics(trades)
-    if m["n"] == 0:
-        print(f"  ยังไม่มี trade ที่ปิดในไตรมาสนี้ (0 closed trades).")
-        print(f"  ระบบเพิ่งเริ่ม — เก็บสถิติต่อไป แล้ว metrics จะมีค่าเมื่อมีไม้ปิดจริง.\n")
+    n = m.get("n", 0)
+    lines = [f"📊 SET DW Q-Close — วิเคราะห์ {quarter} ({cost_label})", ""]
+
+    bs = (budget_status(budget, trades, opens)
+          if budget and budget.get("quarter") == quarter else None)
+
+    # Verdict — one glance: is the edge working, and are we inside the risk budget?
+    if n == 0:
+        verdict = "🟡 ยังไม่พอข้อมูล — ไม่มีไม้ปิดในไตรมาสนี้ (ระบบเพิ่งเริ่ม/ยังถืออยู่)"
+    elif bs and bs["breached"]:
+        verdict = "🔴 เกินงบ drawdown — เบรกลดขนาดโพซิชัน"
+    elif m["expectancy_pct"] > 0 and _pf_ok(m["profit_factor"]):
+        verdict = "🟢 edge ทำงานดี — เดินระบบต่อ"
+    elif m["expectancy_pct"] > 0:
+        verdict = "🟡 edge เป็นบวกแต่ยังบาง (PF ต่ำกว่าเป้า 1.9)"
     else:
-        print(f"  ① EXPECTANCY (edge/ไม้)")
-        print(f"       {m['expectancy_pct']:+.2f}% ต่อไม้   ({_fmt_baht(m['expectancy_baht'])} ฿/ไม้)")
-        print(f"       winrate {m['winrate']*100:.0f}%  |  avg win {m['avg_win_pct']:+.2f}%"
-              f"  avg loss {m['avg_loss_pct']:+.2f}%")
-        print()
-        print(f"  ② PROFIT FACTOR")
-        print(f"       {_fmt_pf(m['profit_factor']).strip()}   (Σwin / Σloss, เป้า ≥ 1.9)")
-        print(f"       รวม {m['n']} ไม้: {m['wins']}W / {m['losses']}L / {m['flat']}=  "
-              f"→ {_fmt_baht(m['total_baht'])} ฿")
-        print()
-        print(f"  ③ SIGNAL ATTRIBUTION (dip vs breakout)")
-        print(f"       {'signal':<14}{'n':>3} {'win%':>6} {'PF':>7} {'exp%':>7} {'฿':>12}")
-        for tag, sm in signal_attribution(trades).items():
-            print(f"       {tag:<14}{sm['n']:>3} {sm['winrate']*100:>5.0f}% "
-                  f"{_fmt_pf(sm['profit_factor']):>7} {sm['expectancy_pct']:>+6.2f}% "
-                  f"{_fmt_baht(sm['total_baht']):>12}")
-        print()
-        print(f"  ④ MAX DRAWDOWN")
-        print(f"       {_fmt_baht(m['max_dd_baht'])} ฿  ({m['max_dd_pct']:+.1f}% ของ peak)")
-        print()
-        print(f"  {'-'*62}")
-        print(f"  closed trades:")
-        print(f"    {'ticker':<12}{'entry→exit':<24}{'reason':<8}{'sig':<10}{'P/L%':>7}{'฿':>12}")
+        verdict = "🔴 edge ติดลบไตรมาสนี้ — ทบทวน entry/exit"
+    lines.append(f"🎯 สรุป: {verdict}")
+
+    if bs:
+        gauge = "🔴 BREACH" if bs["breached"] else "🟢 within budget"
+        lines.append(f"\n💰 งบความเสี่ยง (Q-Open {budget.get('start_date','')}):")
+        lines.append(f"  P/L ไตรมาส {_fmt_baht(bs['total'])} ฿ = {bs['dd_pct']:+.2f}%"
+                     f" · เพดาน -{budget.get('max_drawdown_pct','?')}% · {gauge}")
+        lines.append(f"  (realized {_fmt_baht(bs['realized'])} + open {_fmt_baht(bs['unrealized'])})")
+
+    if n == 0:
+        if opens:
+            unreal = sum(o["pl_baht"] for o in opens)
+            lines.append(f"\n📌 Open {len(opens)} ตัว · unrealized {_fmt_baht(unreal)} ฿ (mark-to-market)")
+        lines.append("\nต้องทำ: เก็บสถิติต่อ — metrics จะมีค่าเมื่อมีไม้ปิดจริง")
+        return "\n".join(lines)
+
+    lines.append(f"\n📈 Edge (จาก {n} ไม้ปิด · {m['wins']}W/{m['losses']}L):")
+    lines.append(f"  Expectancy {m['expectancy_pct']:+.2f}%/ไม้ ({_fmt_baht(m['expectancy_baht'])} ฿)"
+                 f" · winrate {m['winrate']*100:.0f}%")
+    lines.append(f"  Profit Factor {_fmt_pf(m['profit_factor']).strip()} (เป้า ≥1.9)"
+                 f" {'🟢' if _pf_ok(m['profit_factor']) else '🟡'} · Max DD {m['max_dd_pct']:+.1f}%")
+
+    scored = sorted(((tag, sm) for tag, sm in signal_attribution(trades).items() if sm.get("n")),
+                    key=lambda x: -x[1]["total_baht"])
+    if scored:
+        lines.append("\n🔍 Signal ไหนทำเงิน:")
+        for tag, sm in scored:
+            lines.append(f"  {tag:<12} {sm['n']}ไม้ · PF {_fmt_pf(sm['profit_factor']).strip()}"
+                         f" · exp {sm['expectancy_pct']:+.2f}% · {_fmt_baht(sm['total_baht'])} ฿")
+        best, worst = scored[0], scored[-1]
+        if len(scored) > 1 and best[1]["total_baht"] > 0 >= worst[1]["total_baht"]:
+            lines.append(f"  → {best[0]} ทำเงิน, {worst[0]} ฉุด — เอียงน้ำหนักเข้า {best[0]}")
+
+    if opens:
+        unreal = sum(o["pl_baht"] for o in opens)
+        top = [o for o in opens if o["pl_pct"] > 0][:3]
+        lines.append(f"\n📌 Open {len(opens)} ตัว · unrealized {_fmt_baht(unreal)} ฿")
+        if top:
+            lines.append("  นำ: " + " · ".join(f"{o['ticker'].replace('.BK','')} {o['pl_pct']:+.1f}%"
+                                               for o in top))
+
+    todo = []
+    if bs and bs["breached"]:
+        todo.append("ลด size ครึ่ง (regime brake) จนฟื้นเหนือเส้น")
+    if scored and len(scored) > 1 and scored[-1][1]["total_baht"] < 0:
+        todo.append(f"ทบทวน signal {scored[-1][0]} (ขาดทุน)")
+    if m["expectancy_pct"] <= 0:
+        todo.append("edge ติดลบ — ตรวจ entry/exit")
+    if n < 10:
+        todo.append(f"ไม้ปิดยังน้อย ({n}) — ตัวเลขยังไม่นิ่ง")
+    lines.append("\nต้องทำ: " + (" · ".join(todo) if todo else "ไม่มี — เดินตามระบบ"))
+    return "\n".join(lines)
+
+
+def print_report(quarter, trades, opens, cost_label, budget=None):
+    print("\n" + build_analysis(quarter, trades, opens, cost_label, budget))
+
+    # Audit trail — the realized trades behind the numbers (kept for the deep quarterly review).
+    if trades:
+        print(f"\n  {'-'*58}")
+        print("  ไม้ปิดไตรมาสนี้ (audit):")
+        print(f"    {'ticker':<10}{'entry→exit':<24}{'reason':<8}{'sig':<9}{'P/L%':>7}{'฿':>11}")
         for t in sorted(trades, key=lambda r: r["exit_date"] or ""):
             nm = t["ticker"].replace(".BK", "")
             span = f"{t['entry_date']}→{t['exit_date']}"
-            sig = "|".join(t["signals"])[:9]
-            print(f"    {nm:<12}{span:<24}{(t['reason'] or ''):<8}{sig:<10}"
-                  f"{t['pl_pct']:>+6.2f}%{_fmt_baht(t['pl_baht']):>12}")
-        print()
-
-    # open book context
-    if opens:
-        unreal = sum(o["pl_baht"] for o in opens)
-        print(f"  {'-'*62}")
-        print(f"  OPEN ({len(opens)}) — unrealized {_fmt_baht(unreal)} ฿ (mark-to-market):")
-        for o in opens:
-            nm = o["ticker"].replace(".BK", "")
-            q = f"Q{o['quintile']}" if o.get("quintile") else " -"
-            sig = "|".join(o["signals"])[:9]
-            print(f"    {nm:<12}{q:>3} {o['phase']:<5} {sig:<10}"
-                  f"{o['pl_pct']:>+6.2f}%{_fmt_baht(o['pl_baht']):>12}")
-        print()
+            sig = "|".join(t["signals"])[:8]
+            print(f"    {nm:<10}{span:<24}{(t['reason'] or ''):<8}{sig:<9}"
+                  f"{t['pl_pct']:>+6.2f}%{_fmt_baht(t['pl_baht']):>11}")
+    print()
 
 
 def main():
