@@ -230,7 +230,8 @@ def main():
             nm = r["ticker"].replace(".BK", "")
             star = "★" if r.get("quintile") == 1 else " "
             print(f"  {star}{nm:11s}{q:>3s}  close {r['close']:>8.2f}  RSI {r['rsi']:>4.0f}"
-                  f"  ADX {r['adx']:>4.0f}  | {', '.join(r['missing'])}")
+                  f"  ADX {r['adx']:>4.0f}  stop {r['stop']:>8.2f}  T1 {r['t1']:>8.2f}"
+                  f"  | {', '.join(r['missing'])}")
         print()
 
     total_ready = len([r for r in ready if r["category"] in ("DIP_READY", "BRK_READY")])
