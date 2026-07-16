@@ -1,1 +1,60 @@
-{}
+{
+  "MNST": {
+    "adx": 43.0,
+    "cur": 99.94,
+    "eff_stop": 94.73,
+    "ema20": 95.9,
+    "entry_close": 99.94,
+    "entry_date": "2026-07-16",
+    "first_seen": "2026-07-16",
+    "flagged_date": null,
+    "init_stop": 94.73,
+    "last_seen": "2026-07-16",
+    "opp_score": 0.0521,
+    "phase": "FULL",
+    "pl_pct": 0.0,
+    "quintile": 1,
+    "regime_mult": 1.0,
+    "rsi": 70.0,
+    "signals": [
+      "breakout"
+    ],
+    "size": 85,
+    "size_mult": 1.5,
+    "state": "HOLDING",
+    "status": "HOLD",
+    "stop": 94.73,
+    "t1": 105.15,
+    "t1_date": null,
+    "t2": 107.76
+  },
+  "USB": {
+    "adx": 37.0,
+    "cur": 64.01,
+    "eff_stop": 60.6,
+    "ema20": 61.03,
+    "entry_close": 64.01,
+    "entry_date": "2026-07-16",
+    "first_seen": "2026-07-16",
+    "flagged_date": null,
+    "init_stop": 60.6,
+    "last_seen": "2026-07-16",
+    "opp_score": 0.0533,
+    "phase": "FULL",
+    "pl_pct": 0.0,
+    "quintile": 1,
+    "regime_mult": 1.0,
+    "rsi": 70.0,
+    "signals": [
+      "breakout"
+    ],
+    "size": 130,
+    "size_mult": 1.5,
+    "state": "HOLDING",
+    "status": "HOLD",
+    "stop": 60.6,
+    "t1": 67.42,
+    "t1_date": null,
+    "t2": 69.13
+  }
+}
