@@ -55,8 +55,8 @@ def test_apply_size_tilt_reapplies_from_base_never_compounds():
 
 def test_apply_size_tilt_floors():
     plan = {"size": 1001}
-    sig.apply_size_tilt(plan, 2)      # 1001 * 1.25 = 1251.25 -> 1251
-    assert plan["size"] == 1251
+    sig.apply_size_tilt(plan, 2)      # 1001 * 1.25 = 1251.25 -> 1251 -> lot 100 -> 1200
+    assert plan["size"] == 1200
 
 
 def test_trade_plan_buy_is_signal_close():
@@ -77,8 +77,8 @@ def test_trade_plan_then_tilt_integration():
 
 def test_regime_brake_halves_size():
     plan = {"size": 1000}
-    sig.apply_size_tilt(plan, 1, regime_mult=0.5)   # base 1000 × Q1 1.5 × 0.5 = 750
-    assert plan["size"] == 750
+    sig.apply_size_tilt(plan, 1, regime_mult=0.5)   # base 1000 × Q1 1.5 × 0.5 = 750 -> lot 100 -> 700
+    assert plan["size"] == 700
     assert plan["regime_mult"] == 0.5
 
 

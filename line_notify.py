@@ -62,6 +62,15 @@ def _disp_name(ticker, quintile=None):
     return ("★" + base) if quintile == 1 else base
 
 
+def _fmt_date(d):
+    """Compact 'DD/MM' from an ISO 'YYYY-MM-DD' entry date, or '-' when missing."""
+    s = str(d or "")
+    parts = s.split("-")
+    if len(parts) == 3:
+        return f"{parts[2]}/{parts[1]}"
+    return "-"
+
+
 def _format_validated_section(validated: list[dict]) -> str:
     """Render the 'prior-scan hits — still holdable?' block. Each item:
     {ticker, close (=entry), and optionally cur, pl_pct, status, quintile}. `status` is
@@ -116,28 +125,39 @@ def format_positions_section(holding: list[dict] | None,
                 nm_new = r["rotate_for"].replace(".BK", "")
                 diff = (r.get("opp_diff") or 0) * 100
                 note = f"สับเปลี่ยน → เข้า {nm_new} (upside ดีกว่า {diff:.0f}%)"
-            lines.append(f"  {name} {r.get('sell_reason','?')} เข้า {r.get('entry_close')}"
-                         f" → ล่าสุด {r.get('cur')} ({_fmt_pct(r.get('pl_pct')).strip()}) — {note}")
+            lines.append(f"  {name} {r.get('sell_reason','?')}  {_fmt_pct(r.get('pl_pct')).strip()}")
+            lines.append(f"    เข้า {_fmt_date(r.get('entry_date'))} @{_fmt_num(r.get('entry_close'), 0).strip()}"
+                         f" → ล่าสุด {_fmt_num(r.get('cur'), 0).strip()}"
+                         f" · 🛑 {_fmt_num(r.get('stop'), 0).strip()}"
+                         f" · 🎯 T1 {_fmt_num(r.get('t1'), 0).strip()}")
+            lines.append(f"    {note}")
         blocks.append("\n".join(lines))
     if t1_today:
         lines = [f"🔵 ถึง T1 ({len(t1_today)}):"]
         for r in t1_today:
             name = _disp_name(r.get("ticker"), r.get("quintile"))
-            lines.append(f"  {name} เข้า {r.get('entry_close')} → ล่าสุด {r.get('cur')}"
-                         f" ({_fmt_pct(r.get('pl_pct')).strip()}) — เลื่อน stop มาทุน + ปล่อยวิ่ง")
+            lines.append(f"  {name}  {_fmt_pct(r.get('pl_pct')).strip()}")
+            lines.append(f"    เข้า {_fmt_date(r.get('entry_date'))} @{_fmt_num(r.get('entry_close'), 0).strip()}"
+                         f" → ล่าสุด {_fmt_num(r.get('cur'), 0).strip()}"
+                         f" · เลื่อน stop → ทุน ({_fmt_num(r.get('entry_close'), 0).strip()})"
+                         f" · 🎯 T2 {_fmt_num(r.get('t2'), 0).strip()} ปล่อยวิ่ง")
         blocks.append("\n".join(lines))
     if holding:
         names = [_disp_name(r.get("ticker"), r.get("quintile")) for r in holding]
         w = max([len(n) for n in names] + [6])
-        hdr = f"{'Ticker':<{w}}  {'Stat':<4}  {'Entry':>7}  {'Now':>7}  {'P/L':>6}"
+        hdr = (f"{'Ticker':<{w}}  {'Stat':<4}  {'Date':<5}  {'Entry':>7}  {'Now':>7}"
+               f"  {'Stop':>7}  {'T1':>7}  {'P/L':>6}")
         lines = [f"📈 ถืออยู่ ({len(holding)}):\n", hdr, "-" * len(hdr)]
         for r, name in zip(holding, names):
             st = (r.get("status") or "?")[:4]
             mark = "•" if r.get("new") else ""
-            lines.append(f"{name:<{w}}  {st:<4}  {_fmt_num(r.get('entry_close'), 7)}"
-                         f"  {_fmt_num(r.get('cur'), 7)}  {_fmt_pct(r.get('pl_pct'))}{mark}")
-        lines.append("\nHOLD=ถือเต็ม(ก่อน T1)  RUN=ล็อกทุนแล้ว ปล่อยวิ่ง  "
-                     "ขายเมื่อ: หลุดสต็อป/หลุด EMA20(หลัง T1)  •=เข้าใหม่วันนี้")
+            lines.append(f"{name:<{w}}  {st:<4}  {_fmt_date(r.get('entry_date')):<5}"
+                         f"  {_fmt_num(r.get('entry_close'), 7)}  {_fmt_num(r.get('cur'), 7)}"
+                         f"  {_fmt_num(r.get('stop'), 7)}  {_fmt_num(r.get('t1'), 7)}"
+                         f"  {_fmt_pct(r.get('pl_pct'))}{mark}")
+        lines.append("\nStat: HOLD=ถือเต็ม(ก่อน T1) · RUN=ล็อกทุนแล้ว ปล่อยวิ่ง")
+        lines.append("Date=วันเข้าซื้อ · Stop=จุดขายตัดขาดทุน · T1=เป้าแรก(+1R)")
+        lines.append("ขายเมื่อ: หลุด Stop / หลุด EMA20(หลัง T1) · •=เข้าใหม่วันนี้")
         if any(r.get("quintile") == 1 for r in holding):
             lines.append("★=ผู้นำ composite Q1 (mom+trend)")
         blocks.append("\n".join(lines))

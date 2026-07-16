@@ -192,7 +192,26 @@ class TestPositionsSection:
     def test_t1_block(self):
         s = line_notify.format_positions_section(self.HOLD, [], self.T1)
         assert "ถึง T1 (1)" in s and "SCGP" in s
-        assert "เลื่อน stop มาทุน" in s and "ปล่อยวิ่ง" in s
+        assert "เลื่อน stop → ทุน" in s and "ปล่อยวิ่ง" in s
+
+    def test_holding_shows_entry_date_stop_target(self):
+        """Wide holdings table carries the trigger date + stop + T1 target."""
+        hold = [{"ticker": "KCE.BK", "entry_date": "2026-07-14", "entry_close": 45.0,
+                 "cur": 44.25, "pl_pct": -1.7, "status": "HOLD", "stop": 36.25,
+                 "t1": 53.75, "t2": 58.12}]
+        s = line_notify.format_positions_section(hold, [])
+        assert "14/07" in s                       # entry date (DD/MM)
+        assert "45.00" in s and "44.25" in s      # entry + now
+        assert "36.25" in s and "53.75" in s      # stop + T1
+        assert "Date" in s and "Stop" in s and "T1" in s   # column headers
+
+    def test_sell_shows_entry_date_and_levels(self):
+        """Sell rows carry entry date, stop and target detail."""
+        sell = [{"ticker": "ADVANC.BK", "entry_date": "2026-07-14", "entry_close": 382.0,
+                 "cur": 375.0, "pl_pct": -1.8, "status": "ROTATE", "sell_reason": "ROTATE",
+                 "stop": 362.0, "t1": 402.0}]
+        s = line_notify.format_positions_section([], sell)
+        assert "14/07" in s and "382.00" in s and "362.00" in s and "402.00" in s
 
     def test_trail_sell_note(self):
         sell = [{"ticker": "SCGP.BK", "entry_close": 26.5, "cur": 29.6, "pl_pct": 11.7,
