@@ -223,6 +223,12 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
         if ex and ex.get("state") == HOLDING:
             ex["last_seen"] = asof_date
             continue
+        # A signal the capital guard trimmed to 0 shares can't be a real position — don't
+        # record a phantom size=0 holding that would occupy a slot in the ~12-name cap. It
+        # will simply re-fire on a later scan once capital frees up (no cooldown consumed).
+        if not p.get("size"):
+            trans["skipped"].append(t)
+            continue
         if t in cooldown and _bars_since(cooldown[t], asof_date) < COOLDOWN_BARS:
             trans["skipped"].append(t)
             continue

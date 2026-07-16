@@ -234,7 +234,7 @@ def main():
                 row = d.iloc[-1]
                 fired = [s for s in entry_sigs if bool(row.get(s))]
                 if fired:
-                    plan = sig.trade_plan(row, avail, a.risk)
+                    plan = sig.trade_plan(row, a.equity, a.risk, avail=avail)
                     plan["signals"] = fired
                     hits.append((t, plan))
             except Exception as e:
@@ -365,6 +365,34 @@ def main():
     # Sort
     keymap = {"adx": lambda x: x[1]["adx"], "dist": lambda x: x[1]["distPct"], "rsi": lambda x: x[1]["rsi"]}
     hits.sort(key=keymap[a.sort], reverse=True)
+
+    # Aggregate capital guard. Each hit's RISK budget is sized off FULL equity (so wide-stop /
+    # high-priced names clear at least a board lot instead of flooring to 0), but the COMBINED
+    # new-entry notional must still fit the cash on hand. Walk the hits in priority (sort) order,
+    # spending down a running avail: keep a size that fits, else clamp to the whole board lots that
+    # remain (0 once cash is exhausted). Without this, sizing every name off full equity would let
+    # a scan with several fires over-commit the book beyond equity (leverage we don't want on DWs).
+    run_avail = avail
+    capped_thin = []
+    for t, p in hits:
+        close_t = p.get("close") or 0
+        if close_t <= 0:
+            continue
+        want = (p.get("size") or 0) * close_t
+        if want <= run_avail:
+            run_avail -= want
+        else:
+            aff = int(run_avail / close_t) // 100 * 100
+            if aff < (p.get("size") or 0):
+                capped_thin.append((t, p.get("size"), aff))
+            p["size"] = aff
+            run_avail -= aff * close_t
+    if capped_thin:
+        print("\n  ⚠ CAPITAL CAP: new entries trimmed to fit available cash "
+              f"(avail ฿{avail:,.0f}):")
+        for t, was, now in capped_thin:
+            print(f"    {t:12s} {was:,} → {now:,} shares"
+                  + ("  (skipped — no cash left)" if now == 0 else ""))
 
     # Report
     entry_lbl = "dip" if a.entry == "dip" else "dip|brk"

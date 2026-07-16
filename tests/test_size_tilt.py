@@ -75,6 +75,22 @@ def test_trade_plan_then_tilt_integration():
     assert p["size"] == 15_000 and p["size_base"] == 10_000
 
 
+def test_trade_plan_risk_off_equity_cap_off_avail():
+    """Risk budget uses full equity; the affordability cap uses `avail`. A wide-stop,
+    high-priced name that would floor to 0 when sized off a shrunken avail now clears a
+    board lot, but the per-name cap never exceeds cash on hand."""
+    # RATCH-like: close 37.75, stop 31.75 -> risk_u 6.0. avail small (book nearly full).
+    row = pd.Series({"Close": 37.75, "llStop": 31.75, "ema": 35.0, "rsi": 60, "adx": 25})
+    old = sig.trade_plan(row, equity=35_700, risk_pct=1.0)                 # risk off avail -> 0
+    new = sig.trade_plan(row, equity=100_000, risk_pct=1.0, avail=35_700)  # risk off equity
+    assert old["size"] == 0
+    assert new["size"] == 100          # (100000*1%)/6.0 = 166 -> lot 100
+    # Cap binds when avail is tighter than the risk budget wants.
+    cheap = pd.Series({"Close": 2.0, "llStop": 1.83, "ema": 1.9, "rsi": 60, "adx": 25})
+    capped = sig.trade_plan(cheap, equity=100_000, risk_pct=1.0, avail=300)
+    assert capped["size"] == 100       # min(risk 5800, floor(300/2.0)=150) -> lot 100
+
+
 def test_regime_brake_halves_size():
     plan = {"size": 1000}
     sig.apply_size_tilt(plan, 1, regime_mult=0.5)   # base 1000 × Q1 1.5 × 0.5 = 750 -> lot 100 -> 700

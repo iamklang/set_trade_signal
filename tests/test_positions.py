@@ -35,6 +35,17 @@ def test_fresh_buy_enters_full():
     assert not tr["t1_today"] and not tr["sell_today"]
 
 
+def test_zero_size_hit_not_recorded():
+    """A hit the capital guard trimmed to 0 shares must not become a phantom holding
+    (it would occupy a slot in the ~12-name cap). It's skipped and can re-fire later."""
+    zero = ("X.BK", {"close": 10.0, "stop": 9.0, "t1": 11.0, "t2": 11.5,
+                     "rsi": 60, "adx": 25, "size": 0, "distPct": -0.5})
+    state, tr = pos.update({}, [zero], _fr(10.0), "2026-07-01")
+    assert "X.BK" not in state          # no phantom position written
+    assert "X.BK" in tr["skipped"]
+    assert not tr["holding"]
+
+
 def test_no_early_exit_below_entry_above_stop():
     """No WEAK/EMA exit before T1: drifting below entry but above stop must HOLD."""
     state, _ = pos.update({}, [_hit("X.BK")], _fr(10.0), "2026-07-01")

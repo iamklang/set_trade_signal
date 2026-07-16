@@ -132,15 +132,26 @@ def live_status(df, entry, stop, t1, t2):
     return out
 
 
-def trade_plan(row, equity, risk_pct, rr1=RR1, rr2=RR2):
+def trade_plan(row, equity, risk_pct, rr1=RR1, rr2=RR2, avail=None):
     """Given a signal row (a df row with Close/ema/llStop/rsi/adx), return the
-    §7 entry plan: stop, risk/unit, T1, T2, size, dist%."""
+    §7 entry plan: stop, risk/unit, T1, T2, size, dist%.
+
+    Two independent capital bases keep fixed-fractional sizing honest without
+    starving late entries:
+      - RISK budget is always 1%(risk_pct) of `equity` (full account) — so a
+        name's share count reflects its stop distance, not how full the book is.
+      - The affordability cap uses `avail` (remaining capital = equity−committed)
+        when given, so we never plan more shares than cash on hand allows.
+    `avail=None` -> cap off `equity` (unchanged for alert.py / scan_bull.py, which
+    already pass full equity). Wide-stop / high-priced names that used to floor to
+    0 when sized off a shrunken `avail` now clear at least a board lot."""
     close = float(row["Close"])
     stop = float(row["llStop"])
     risk_u = close - stop
     size = int(np.floor((equity * risk_pct / 100) / risk_u)) if risk_u > 0 else 0
+    cap_base = equity if avail is None else avail
     if size > 0 and close > 0:
-        max_by_capital = int(np.floor(equity / close))
+        max_by_capital = int(np.floor(cap_base / close))
         size = min(size, max_by_capital)
     size = size // 100 * 100
     return {
