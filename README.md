@@ -32,6 +32,30 @@
 
 Plists อยู่ที่ `~/Library/LaunchAgents/com.klang.set-*.plist`
 
+## US S&P 500 (multi-market)
+
+ระบบเดียวกันรันตลาด **US (S&P 500)** ได้ ผ่าน **market profile** (`market.py`) — โค้ด/ตรรกะชุดเดิม
+แต่ state แยกกันทั้งหมด (SET → root, US → `us/`) ไม่ปนกัน เลือกด้วย `--market us` หรือ env `TR_MARKET=us`
+
+| ต่างจาก SET | SET | US |
+|---|---|---|
+| Universe | `set100.bk.txt` | `us/us500.txt` (503 ชื่อ) |
+| State | root | `us/positions.json`, `us/quarter.json`, `us/scans/` |
+| Board lot | 100 หุ้น | **1 หุ้น** |
+| Costs | tick + 0.157% | ~$0 comm + penny half-spread |
+| Instrument | DW | หุ้น / options (`/us-options`) |
+
+```bash
+./us_daily      # EOD: dip + composite + bull (S&P 500) → us/ state
+./us_morning    # pre-open ready-list (analytical brief)
+~/.venvs/trading-dr/bin/python scan_dip.py --market us --composite
+~/.venvs/trading-dr/bin/python quarterly_review.py --market us
+```
+
+> ⚠️ **ตรรกะจูนบน SET — ยังไม่ validate บน US** (ดู `/us-evidence`) เริ่มเล็ก/paper ก่อนจนกว่าจะพิสูจน์ตัวเอง
+
+Skills: `/us-swing` (master), `/us-macro`, `/us-entry`, `/us-earnings`, `/us-options`, `/us-risk`, `/us-evidence`
+
 ## Config
 
 | File | หน้าที่ |
@@ -148,6 +172,18 @@ Slash commands สำหรับใช้ใน Claude Code — แต่ละ
 | `/set-risk` | Sizing (lot 100), exits, lifecycle, position cap, rotation |
 | `/set-evidence` | Backtest results, อะไรผ่าน/ไม่ผ่าน, limitations |
 
+**US (S&P 500)** — ตรรกะเดียวกัน พอร์ตแยก (ดู `/us-evidence` เรื่อง validation):
+
+| Skill | ใช้เมื่อ |
+|---|---|
+| `/us-swing` | Master index สำหรับระบบ US S&P 500 |
+| `/us-macro` | Fed/rates, SPX/NDX trend, sector leadership, VIX |
+| `/us-entry` | Chart plan, entry/stop/target หุ้น US |
+| `/us-earnings` | Earnings: beat/miss, guidance, sell-the-news, IV crush |
+| `/us-options` | เลือก option (DW analog): delta, IV rank, DTE, LEAPS |
+| `/us-risk` | Sizing (lot 1), exits, PDT rule, assignment |
+| `/us-evidence` | อะไร validate/ยังไม่ validate บน US, ความเสี่ยง |
+
 Skills อยู่ที่ `.claude/skills/set-*/SKILL.md`
 
 ## Agents
@@ -165,18 +201,20 @@ Agents อยู่ที่ `.claude/agents/*.md`
 ```
 trading_dr/
   *.py               core modules + daily scanners (flat — imported by name)
-  quarter.json  market_regime.json  positions.json   config/state (root)
-  set100.bk.txt  watchlist.txt  composite_rank.csv    universes/rank (root)
-  daily_scan  morning_scan  run_viewer.sh             wrapper scripts
+  market.py          market profile: routes state/universe/cost per market (SET|US)
+  quarter.json  market_regime.json  positions.json   SET config/state (root)
+  set100.bk.txt  watchlist.txt  composite_rank.csv    SET universe/rank (root)
+  daily_scan  morning_scan  us_daily  us_morning       wrapper scripts (SET + US)
+  us/                US state: us500.txt, quarter.json, positions.json, scans/
   backtests/         bt_*.py (research; run with full path)
-  scans/             dated outputs: dip_scan_*.csv, bull_scan_*.csv, bull_msg.txt
+  scans/             SET dated outputs: dip_scan_*.csv, bull_scan_*.csv, bull_msg.txt
   tradingview/       *.pine (TradingView indicator + strategy)
   docs/              คู่มือ + specs/
   data/              regenerable price cache (gitignored)
   logs/              runtime logs (gitignored)
   reports/           quarterly HTML
   tests/             pytest suite
-  .claude/           skills/ + agents/
+  .claude/           skills/ (set-* + us-*) + agents/
 ```
 
 Core `.py` modules stay flat at the root (they import each other by name and are

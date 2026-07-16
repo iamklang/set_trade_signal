@@ -36,7 +36,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import costs
+import market
 
+# Repo-root-relative path to the active market's positions.json (SET → "positions.json",
+# US → "us/positions.json") — git log/show address it by this path. Reset in main() once the
+# market is selected.
 POS_FILE = "positions.json"
 _COOLDOWN_KEY = "_cooldown"
 
@@ -224,7 +228,7 @@ def signal_attribution(trades):
 
 def load_budget():
     """Read quarter.json (the Q-Open risk budget), or None if absent/corrupt."""
-    path = os.path.join(HERE, "quarter.json")
+    path = market.state_path("quarter.json")
     try:
         with open(path) as f:
             b = json.load(f)
@@ -272,7 +276,7 @@ def build_analysis(quarter, trades, opens, cost_label, budget=None):
     context, and an action line — the distilled decision rather than a raw metrics dump."""
     m = metrics(trades)
     n = m.get("n", 0)
-    lines = [f"📊 SET DW Q-Close — วิเคราะห์ {quarter} ({cost_label})", ""]
+    lines = [f"📊 {market.tag()} Q-Close — วิเคราะห์ {quarter} ({cost_label})", ""]
 
     bs = (budget_status(budget, trades, opens)
           if budget and budget.get("quarter") == quarter else None)
@@ -360,12 +364,16 @@ def print_report(quarter, trades, opens, cost_label, budget=None):
 
 
 def main():
+    global POS_FILE
     ap = argparse.ArgumentParser(description="Quarterly (Q-Close) review from positions.json git history")
+    ap.add_argument("--market", default=None, help="market profile: set (default) | us")
     ap.add_argument("--quarter", help="YYYYQn (default: quarter of the latest snapshot)")
     ap.add_argument("--all", action="store_true", help="all closed trades, ignore quarter filter")
-    ap.add_argument("--gross", action="store_true", help="gross P/L (skip SET cost model)")
+    ap.add_argument("--gross", action="store_true", help="gross P/L (skip the cost model)")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     a = ap.parse_args()
+    market.set_market(a.market)
+    POS_FILE = os.path.relpath(market.state_path("positions.json"), HERE)
 
     snaps = snapshots()
     if not snaps:

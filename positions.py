@@ -29,9 +29,16 @@ import os
 from datetime import date
 
 import setdw_signal as sig
+import market
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Resolved per active market at call time (SET → repo root; US → us/). Kept as a module
+# attribute for back-compat, but load()/save() default to the live market path.
 DEFAULT_PATH = os.path.join(HERE, "positions.json")
+
+
+def _default_path():
+    return market.state_path("positions.json")
 
 HOLDING = "HOLDING"
 SELL_FLAGGED = "SELL_FLAGGED"
@@ -76,8 +83,10 @@ def _bars_since(then, now):
     return _days_since(then, now)
 
 
-def load(path=DEFAULT_PATH):
-    """Read positions.json -> {ticker: record}. Missing/corrupt file -> {}."""
+def load(path=None):
+    """Read positions.json -> {ticker: record}. Missing/corrupt file -> {}.
+    path=None → the active market's positions.json (SET root / US us/)."""
+    path = path or _default_path()
     try:
         with open(path) as f:
             data = json.load(f)
@@ -86,8 +95,9 @@ def load(path=DEFAULT_PATH):
         return {}
 
 
-def save(positions, path=DEFAULT_PATH):
-    """Write positions.json (sorted keys, 2-space indent)."""
+def save(positions, path=None):
+    """Write positions.json (sorted keys, 2-space indent). path=None → active market."""
+    path = path or _default_path()
     with open(path, "w") as f:
         json.dump(positions, f, indent=2, sort_keys=True, ensure_ascii=False)
 

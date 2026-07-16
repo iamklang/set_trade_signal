@@ -24,6 +24,22 @@ _TICKS = [
 # is the same figure the .pine strategy used, kept as the default so results stay comparable.
 COMMISSION = 0.00157
 
+# US retail model: ~$0 commission (zero-commission brokers) + a penny (0.01) quote tick. Liquid
+# S&P 500 names quote ~1 penny wide, so the half-spread is ~$0.005 relative to price — far cheaper
+# than the SET. Selected automatically for the US market profile (market.cost_mode() == "us").
+US_COMMISSION = 0.0
+US_TICK = 0.01
+
+
+def _active_cost_mode():
+    """The active market's cost model ('set' default). Imported lazily to avoid any import
+    ordering concerns; falls back to 'set' if the profile module is unavailable."""
+    try:
+        import market
+        return market.cost_mode()
+    except Exception:
+        return "set"
+
 
 def set_tick(price):
     """The SET minimum tick (price step) for a given price."""
@@ -42,10 +58,24 @@ def half_spread_frac(price, spread_ticks=1.0):
     return 0.5 * spread_ticks * set_tick(price) / price
 
 
-def side_cost(price, spread_ticks=1.0, commission=COMMISSION):
+def us_half_spread_frac(price, spread_ticks=1.0):
+    """Half the quoted spread as a fraction of price under the US penny-tick model."""
+    if price is None or price <= 0:
+        return 0.0
+    return 0.5 * spread_ticks * US_TICK / price
+
+
+def side_cost(price, spread_ticks=1.0, commission=None, mode=None):
     """Per-SIDE cost fraction a taker pays vs mid: commission + half the quoted spread. Round-trip
-    ≈ 2×. Use spread_ticks=0 to model perfect limit-order fills (commission only)."""
-    return commission + half_spread_frac(price, spread_ticks)
+    ≈ 2×. Use spread_ticks=0 to model perfect limit-order fills (commission only). `mode` selects
+    the market cost model ('set'/'us'); None → the active market profile. Backward compatible: an
+    explicit `commission` overrides the model default."""
+    mode = mode or _active_cost_mode()
+    if mode == "us":
+        c = US_COMMISSION if commission is None else commission
+        return c + us_half_spread_frac(price, spread_ticks)
+    c = COMMISSION if commission is None else commission
+    return c + half_spread_frac(price, spread_ticks)
 
 
 def trailing_turnover(df, window=20, asof=None):

@@ -1,0 +1,10 @@
+{
+  "quarter": "2026Q3",
+  "start_date": "2026-07-16",
+  "start_equity": 30000,
+  "risk_per_trade_pct": 1.0,
+  "max_positions": 12,
+  "max_drawdown_pct": 8.0,
+  "action_on_breach": "halve position size (regime brake) until equity recovers above the -8% line",
+  "notes": "US (S&P 500) Q-Open baseline. Same Medallion-style discipline as the SET book but UNPROVEN on US (see /us-evidence) — start small, paper/tiny-size until it earns its track record. Board lot = 1 share. Under $25k mind the PDT rule (see /us-risk). Tune to real account capital."
+}

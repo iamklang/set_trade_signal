@@ -31,10 +31,11 @@ import bullish_signals as bull
 import set_data
 import profiles
 import costs
+import market
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# Dated scan outputs (dip_scan_*.csv / bull_scan_*.csv) live under scans/, not the repo root.
-SCANS_DIR = os.path.join(HERE, "scans")
+# Dated scan outputs live under <state_dir>/scans (SET → repo root; US → us/). Resolved per
+# active market at call time via market.scans_dir().
 
 
 def prune_scan_dupes(here):
@@ -77,9 +78,10 @@ def check_trading_day(requested: date) -> tuple[bool, date]:
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="SET BUY(dip) scanner")
-    p.add_argument("--universe", default="set100.bk.txt", help="ticker file (one .BK per line)")
-    p.add_argument("--equity", type=float, default=100_000, help="account equity (THB)")
+    p = argparse.ArgumentParser(description="BUY(dip) scanner")
+    p.add_argument("--market", default=None, help="market profile: set (default) | us")
+    p.add_argument("--universe", default=None, help="ticker file (default: the market's universe)")
+    p.add_argument("--equity", type=float, default=None, help="account equity (default: market's)")
     p.add_argument("--risk", type=float, default=1.0, help="risk per trade (percent)")
     p.add_argument("--rsi", type=int, default=sig.RSI_MIN, help="RSI(14) minimum")
     p.add_argument("--adx", type=int, default=sig.ADX_MIN, help="ADX(14) minimum")
@@ -177,6 +179,11 @@ def book_equity(here, fallback_equity):
 
 def main():
     a = parse_args()
+    market.set_market(a.market)                          # select market before any state path
+    if a.universe is None:
+        a.universe = market.universe_path()
+    if a.equity is None:
+        a.equity = market.default_equity()
     cfg = {"rsi_min": a.rsi, "adx_min": a.adx, "maxext": a.maxext,
            "need_vol_conf": not a.novol}
     entry_sigs = ["dip"] if a.entry == "dip" else ["dip", "breakout"]
@@ -275,7 +282,7 @@ def main():
     # is hot; ddbrake halves new sizing when the book is >12% off its equity peak. Default ON;
     # --no-regime-brake disables (regime_mult stays 1.0). Skip the book (ddbrake) leg for --asof
     # historical scans, where today's live book doesn't reflect that date.
-    _here0 = os.path.dirname(os.path.abspath(__file__))
+    _here0 = market.state_dir()                          # per-market state (quarter/regime)
     if a.asof:
         equity_now, peak = None, None
     else:
@@ -289,7 +296,7 @@ def main():
     # ~12mo+ of history for 12-1 momentum; SET data serves only ~1yr, so when the dip
     # source is SET we rank off a separate Yahoo pull (long history) instead.
     comp, comp_fresh = None, False
-    rank_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "composite_rank.csv")
+    rank_path = market.state_path("composite_rank.csv")
     if a.composite:
         import composite as comp_mod
         # Reuse a still-fresh ranking file instead of re-pulling Yahoo for 100 names daily —
@@ -456,8 +463,9 @@ def main():
               + ", ".join(f"{t.replace('.BK','')}(฿{tv/1e6:.0f}M)" for t, tv in dropped_thin))
 
     pct = avail / a.equity * 100 if a.equity > 0 else 0
-    print(f"\n  Capital: equity ฿{a.equity:,.0f} | committed ฿{committed:,.0f} | "
-          f"available ฿{avail:,.0f} ({pct:.0f}%)")
+    cur = market.currency()
+    print(f"\n  Capital: equity {cur}{a.equity:,.0f} | committed {cur}{committed:,.0f} | "
+          f"available {cur}{avail:,.0f} ({pct:.0f}%)")
 
     # ---- Stateful BUY/SELL managed watchlist (positions.json) --------------------
     # scan_dip is the SOLE writer: fold today's fresh BUY(dip) hits into the persistent
@@ -539,25 +547,25 @@ def main():
           "(SKILL §1–§4b) before acting. Data is EOD; mechanical signal alone is ~break-even.\n")
 
     # CSV — include run timestamp so repeated scans don't overwrite
-    os.makedirs(SCANS_DIR, exist_ok=True)
+    scans_dir = market.scans_dir()
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     if hits:
-        csv_path = a.csv or os.path.join(SCANS_DIR, f"dip_scan_{asof_str}_{run_ts}.csv")
+        csv_path = a.csv or os.path.join(scans_dir, f"dip_scan_{asof_str}_{run_ts}.csv")
         rows = [{"ticker": t, **{k: ("|".join(v) if k == "signals" and isinstance(v, list)
                                      else round(v, 4) if isinstance(v, float) else v)
                                  for k, v in p.items()}} for t, p in hits]
         pd.DataFrame(rows).to_csv(csv_path, index=False)
         print(f"  saved {csv_path}\n")
     else:
-        csv_path = a.csv or os.path.join(SCANS_DIR, f"dip_scan_{asof_str}_{run_ts}.csv")
+        csv_path = a.csv or os.path.join(scans_dir, f"dip_scan_{asof_str}_{run_ts}.csv")
         pd.DataFrame(columns=["ticker"]).iloc[:0].to_csv(csv_path, index=False)
         print(f"  saved {csv_path} (no signals)\n")
 
     # Housekeeping: one dip_scan CSV per date (drop same-day dupes) + keep only recent dates,
     # before validating.
     import housekeeping
-    pruned = prune_scan_dupes(SCANS_DIR)
-    pruned += housekeeping.retain_newest(os.path.join(SCANS_DIR, "dip_scan_*.csv"), keep=40)
+    pruned = prune_scan_dupes(scans_dir)
+    pruned += housekeeping.retain_newest(os.path.join(scans_dir, "dip_scan_*.csv"), keep=40)
     if pruned:
         print(f"  pruned {pruned} old/duplicate scan file(s)")
 
@@ -566,6 +574,7 @@ def main():
     print("  running validation on all scans...")
     subprocess.run(
         [sys.executable, os.path.join(os.path.dirname(__file__), "validate_scans.py"),
+         "--market", market.current(),
          "--source", a.source, "--cache-hours", str(max(a.cache_hours, 4))],
     )
 

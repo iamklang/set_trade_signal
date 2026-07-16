@@ -30,6 +30,7 @@ import set_data
 import composite as comp_mod
 import profiles
 import line_notify
+import market
 
 try:
     import exchange_calendars as xcals
@@ -38,8 +39,8 @@ except Exception:
     _CAL = None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# Dated scan outputs + the bull->alert handoff (bull_msg.txt) live under scans/, not the root.
-SCANS_DIR = os.path.join(HERE, "scans")
+# Dated scan outputs + the bull->alert handoff (bull_msg.txt) live under <state_dir>/scans,
+# resolved per active market at call time via market.scans_dir().
 
 
 def load_universe(path):
@@ -61,9 +62,10 @@ def fetch_yahoo(t, period="2y"):
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="SET broad bullish-signal scanner")
-    p.add_argument("--universe", default=os.path.join(HERE, "set100.bk.txt"))
-    p.add_argument("--equity", type=float, default=100_000)
+    p = argparse.ArgumentParser(description="Broad bullish-signal scanner")
+    p.add_argument("--market", default=None, help="market profile: set (default) | us")
+    p.add_argument("--universe", default=None, help="ticker file (default: the market's universe)")
+    p.add_argument("--equity", type=float, default=None, help="account equity (default: market's)")
     p.add_argument("--risk", type=float, default=1.0)
     p.add_argument("--signals", default="all",
                    help="comma list to require (any-of) from dip,breakout,reclaim,golden,trend; "
@@ -84,6 +86,11 @@ def parse_args():
 
 def main():
     a = parse_args()
+    market.set_market(a.market)
+    if a.universe is None:
+        a.universe = market.universe_path()
+    if a.equity is None:
+        a.equity = market.default_equity()
     want = None if a.signals.strip().lower() == "all" else \
         [s.strip() for s in a.signals.split(",") if s.strip()]
     if want:
@@ -134,7 +141,7 @@ def main():
     # 12-1 momentum needs ~12mo history, which SET data (~1yr) can't warm, so recomputing off
     # SET frames yields nothing. Fall back to an inline Yahoo-based ranking only if no file.
     ranks, comps = {}, {}
-    rpath = os.path.join(HERE, "composite_rank.csv")
+    rpath = market.state_path("composite_rank.csv")
     if os.path.exists(rpath):
         try:
             rdf = pd.read_csv(rpath)
@@ -159,7 +166,7 @@ def main():
             print("  ⚠ no composite_rank.csv and inline ranking empty — quintiles unavailable")
     # Same size tilt as scan_dip/alert (quintile × market-regime brake) so a name that shows up
     # in BOTH the bull shortlist and the dip alert never displays two different sizes.
-    regime_factor, regime_age = sig.load_market_regime(os.path.join(HERE, "market_regime.json"))
+    regime_factor, regime_age = sig.load_market_regime(market.state_path("market_regime.json"))
     if regime_age is None:
         print("  ⚠ market_regime.json missing — regime brake NOT applied to sizes below")
     elif regime_age > 48:
@@ -219,9 +226,9 @@ def main():
     # combined LINE brief; only push it directly when NOT running inside that pipeline.
     msg = line_notify.format_bull_message(shortlist, len(tickers), trend_total,
                                           tally, scan_date=asof_str)
+    scans_dir = market.scans_dir()
     try:
-        os.makedirs(SCANS_DIR, exist_ok=True)
-        with open(os.path.join(SCANS_DIR, "bull_msg.txt"), "w") as f:
+        with open(os.path.join(scans_dir, "bull_msg.txt"), "w") as f:
             f.write(msg)
     except OSError:
         pass
@@ -234,8 +241,7 @@ def main():
         print("  bull section saved to bull_msg.txt (LINE suppressed — folded into alert)")
 
     # CSV
-    os.makedirs(SCANS_DIR, exist_ok=True)
-    csv_path = a.csv or os.path.join(SCANS_DIR, f"bull_scan_{asof_str}.csv")
+    csv_path = a.csv or os.path.join(scans_dir, f"bull_scan_{asof_str}.csv")
     rows = [{"ticker": t, "asof": asof_str, "quintile": p.get("quintile"),
              "composite": p.get("comp"), "close": p["close"], "distPct": round(p["distPct"], 2),
              "rsi": round(p["rsi"], 1), "adx": round(p["adx"], 1), "stop": p["stop"],
@@ -245,7 +251,7 @@ def main():
                                 "rsi", "adx", "stop", "t1", "t2", "size", "signals"]).to_csv(csv_path, index=False)
     print(f"\n  saved {os.path.basename(csv_path)}\n")
     import housekeeping
-    housekeeping.retain_newest(os.path.join(SCANS_DIR, "bull_scan_*.csv"), keep=30)
+    housekeeping.retain_newest(os.path.join(scans_dir, "bull_scan_*.csv"), keep=30)
 
 
 if __name__ == "__main__":

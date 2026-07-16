@@ -36,6 +36,7 @@ import set_data
 import profiles
 import line_notify
 import housekeeping
+import market
 
 try:
     import exchange_calendars as xcals
@@ -64,14 +65,9 @@ def expected_last_session(now=None):
         return None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-WATCHLIST = os.path.join(HERE, "watchlist.txt")
-# Account equity — must match quarter.json start_equity and scan_dip's default (the positions
-# book is sized on this basis). Was 1_000_000, which made alert.py's sizes/capital 10× the real
-# 100k account.
-EQUITY = 100_000
+# Watchlist + equity now default to the active market profile (SET root / US us/). The equity
+# must match that market's quarter.json start_equity — the positions book is sized on it.
 RISK_PCT = 1.0
-# Dated scan outputs + the bull->alert handoff live under scans/, not the repo root.
-SCANS_DIR = os.path.join(HERE, "scans")
 _SCAN_DATE_RE = re.compile(r"dip_scan_(\d{4}-\d{2}-\d{2})")
 MAX_VALIDATED = 30          # cap rows in the LINE "validated" section
 
@@ -236,7 +232,7 @@ def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
     holding = holding or []
     sell_today = sell_today or []
     t1_today = t1_today or []
-    lines = [f"📊 SET DW EOD — วิเคราะห์ {scan_date}", ""]
+    lines = [f"📊 {market.tag()} EOD — วิเคราะห์ {scan_date}", ""]
 
     if warnings:
         lines.append("\n".join(warnings) + "\n")
@@ -310,10 +306,11 @@ def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
 
 
 def main():
-    ap = argparse.ArgumentParser(description="SET watchlist BUY(dip) alert")
-    ap.add_argument("--symbols", nargs="*", help="symbols to check (overrides watchlist.txt)")
-    ap.add_argument("--watchlist", default=WATCHLIST, help="watchlist file (one .BK per line)")
-    ap.add_argument("--equity", type=float, default=EQUITY)
+    ap = argparse.ArgumentParser(description="Watchlist BUY(dip) EOD alert")
+    ap.add_argument("--market", default=None, help="market profile: set (default) | us")
+    ap.add_argument("--symbols", nargs="*", help="symbols to check (overrides the watchlist)")
+    ap.add_argument("--watchlist", default=None, help="watchlist file (default: the market's)")
+    ap.add_argument("--equity", type=float, default=None, help="account equity (default: market's)")
     ap.add_argument("--risk", type=float, default=RISK_PCT)
     ap.add_argument("--source", default="yahoo", choices=["set", "yahoo"])
     ap.add_argument("--concurrency", type=int, default=6)
@@ -326,6 +323,11 @@ def main():
                     help="alert only on composite Q1 leaders (reads composite_rank.csv from "
                          "the scan job; without the file it warns and does not filter)")
     a = ap.parse_args()
+    market.set_market(a.market)
+    if a.watchlist is None:
+        a.watchlist = market.watchlist_path()
+    if a.equity is None:
+        a.equity = market.default_equity()
 
     symbols = a.symbols or load_watchlist(a.watchlist)
 
@@ -370,12 +372,12 @@ def main():
 
     # Tag each fired signal with its composite quintile (from the morning scan job) and,
     # with --leaders-only, alert only on the top-quintile (Q1) trend leaders.
-    ranks, rank_age = load_composite_ranks(HERE)
+    ranks, rank_age = load_composite_ranks(market.state_dir())
     # Market-regime brake written by the scan job (halve size when risk-off). A stale/missing
     # file must NOT silently trust an old factor forever (e.g. the scan job died) — it falls
     # back to 1.0 (no brake) and warns, same freshness contract as load_composite_ranks.
     regime_factor, regime_age = sig.load_market_regime(
-        os.path.join(HERE, "market_regime.json"))
+        market.state_path("market_regime.json"))
     if regime_age is None:
         print("\n  ⚠ market_regime.json missing — regime brake NOT applied (scan job hasn't run?)")
         warnings.append("⚠ ไม่พบ market_regime.json — regime brake ไม่ทำงาน (scan job รันหรือยัง?)")

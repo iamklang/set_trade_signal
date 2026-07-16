@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# us_daily — US (S&P 500) EOD pipeline, the market=us twin of ./daily_scan. Run after the US
+# close (~16:15 ET); Yahoo posts the same-day EOD bar in the evening. dip scan (+composite rank
+# +incremental validate) THEN bull scan (writes us/scans/bull_msg.txt for the 16:30 alert to
+# fold in). Separate state from the SET book: everything lives under us/.
+# Self-heals the venv (shared with the SET jobs).
+set -euo pipefail
+
+PROJ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV="$HOME/.venvs/trading-dr"
+PY="$VENV/bin/python"
+
+if [ ! -x "$PY" ] || ! "$PY" -c "import pandas" >/dev/null 2>&1; then
+  echo "venv missing/broken at $VENV — (re)creating it (one-time, ~1–2 min)…" >&2
+  rm -rf "$VENV"
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q --upgrade pip
+  "$VENV/bin/pip" install -q yfinance pandas numpy exchange-calendars
+fi
+
+cd "$PROJ"
+echo "===== us_daily @ $(date '+%Y-%m-%d %H:%M') ====="
+echo "--- 1/2 dip scan + composite rank + validate (S&P 500) ---"
+"$PY" scan_dip.py --market us --composite --source yahoo "$@"
+echo "--- 2/2 bull scan (writes us/scans/bull_msg.txt; LINE folded into the 16:30 alert) ---"
+"$PY" scan_bull.py --market us --source yahoo --no-line
+echo "--- git snapshot (US daily signal history) ---"
+if git -C "$PROJ" add -A && ! git -C "$PROJ" diff --cached --quiet; then
+  git -C "$PROJ" commit -q -m "us_daily $(date '+%Y-%m-%d %H:%M')" \
+    && echo "  committed US daily snapshot" \
+    || echo "  (git commit failed — non-fatal)"
+else
+  echo "  no changes to commit"
+fi

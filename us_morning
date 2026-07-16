@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# us_morning — US (S&P 500) pre-open ready list, the market=us twin of ./morning_scan.
+# Runs scan_ready.py before the US open (~08:45 ET) so the trader sees which S&P 500 names are
+# one bar away from a DIP / BRK trigger. Reads the US book/rank under us/. Self-heals the venv.
+set -euo pipefail
+
+PROJ="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV="$HOME/.venvs/trading-dr"
+PY="$VENV/bin/python"
+
+if [ ! -x "$PY" ] || ! "$PY" -c "import pandas" >/dev/null 2>&1; then
+  echo "venv missing/broken at $VENV — (re)creating it …" >&2
+  rm -rf "$VENV"
+  python3 -m venv "$VENV"
+  "$VENV/bin/pip" install -q --upgrade pip
+  "$VENV/bin/pip" install -q yfinance pandas numpy exchange-calendars
+fi
+
+cd "$PROJ"
+echo "===== us_morning @ $(date '+%Y-%m-%d %H:%M') ====="
+"$PY" scan_ready.py --market us --source yahoo "$@"

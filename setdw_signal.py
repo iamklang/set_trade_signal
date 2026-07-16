@@ -16,6 +16,16 @@ Signal (all on the same, fully-closed bar):
 import pandas as pd
 import numpy as np
 
+import market
+
+
+def _lot():
+    """Active market's board lot for share rounding (SET=100, US=1)."""
+    try:
+        return market.lot()
+    except Exception:
+        return 100
+
 # Defaults identical to the .pine inputs
 EMA_LEN, SMA_LEN = 20, 200
 PROX = 0.015          # pullback proximity to EMA (1.5%)
@@ -153,7 +163,8 @@ def trade_plan(row, equity, risk_pct, rr1=RR1, rr2=RR2, avail=None):
     if size > 0 and close > 0:
         max_by_capital = int(np.floor(cap_base / close))
         size = min(size, max_by_capital)
-    size = size // 100 * 100
+    lot = _lot()
+    size = size // lot * lot
     return {
         "close": close,
         # Next-day entry: the signal-bar close is the reference the whole plan (stop/target/
@@ -198,7 +209,8 @@ def apply_size_tilt(plan, quintile, regime_mult=1.0):
     plan["size_base"] = base
     plan["size_mult"] = mult
     plan["regime_mult"] = regime_mult
-    plan["size"] = int(np.floor(base * mult * regime_mult)) // 100 * 100
+    lot = _lot()
+    plan["size"] = int(np.floor(base * mult * regime_mult)) // lot * lot
     plan["quintile"] = quintile
     return plan
 

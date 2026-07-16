@@ -27,6 +27,7 @@ import yfinance as yf
 import setdw_signal as sig
 import set_data
 import profiles
+import market
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -86,17 +87,19 @@ def validate_one(ticker, scan_date, df_price):
 
 def main():
     ap = argparse.ArgumentParser(description="Validate dip_scan CSV results")
+    ap.add_argument("--market", default=None, help="market profile: set (default) | us")
     ap.add_argument("--file", default=None, help="validate a specific CSV (default: all)")
     ap.add_argument("--source", default="set", choices=["set", "yahoo"])
     ap.add_argument("--concurrency", type=int, default=6)
     ap.add_argument("--cache-hours", type=float, default=4,
                     help="reuse cached data if younger than N hours (default 4)")
     a = ap.parse_args()
+    market.set_market(a.market)
 
     if a.file:
         files = [a.file]
     else:
-        files = sorted(glob.glob(os.path.join(HERE, "scans", "dip_scan_*.csv")))
+        files = sorted(glob.glob(os.path.join(market.scans_dir(), "dip_scan_*.csv")))
 
     if not files:
         print("no dip_scan_*.csv files found.")

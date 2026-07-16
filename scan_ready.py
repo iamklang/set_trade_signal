@@ -31,6 +31,7 @@ import bullish_signals as bull
 import set_data
 import profiles
 import line_notify
+import market
 
 BREAKOUT_NEAR_PCT = 2.0
 
@@ -41,7 +42,7 @@ def load_universe(path):
 
 
 def load_ranks(max_age_h=72):
-    path = os.path.join(HERE, "composite_rank.csv")
+    path = market.state_path("composite_rank.csv")
     if not os.path.exists(path):
         return {}
     if (time.time() - os.path.getmtime(path)) / 3600 > max_age_h:
@@ -149,7 +150,7 @@ def build_report(ready, scan_date="", n_names=0, all_quintiles=False, in_trend=0
     def q1(rows):
         return [r for r in rows if r.get("quintile") == 1]
 
-    lines = [f"📊 SET DW Ready — วิเคราะห์ {scan_date}"
+    lines = [f"📊 {market.tag()} Ready — วิเคราะห์ {scan_date}"
              + ("" if all_quintiles else " (Q1-Q2)"), ""]
 
     breadth = f"ตลาด: {in_trend}/{n_names} ขาขึ้น"
@@ -201,14 +202,18 @@ def build_report(ready, scan_date="", n_names=0, all_quintiles=False, in_trend=0
 
 
 def main():
-    ap = argparse.ArgumentParser(description="SET morning ready-list scanner")
-    ap.add_argument("--universe", default=os.path.join(HERE, "set100.bk.txt"))
+    ap = argparse.ArgumentParser(description="Morning ready-list scanner")
+    ap.add_argument("--market", default=None, help="market profile: set (default) | us")
+    ap.add_argument("--universe", default=None, help="ticker file (default: the market's universe)")
     ap.add_argument("--all-quintiles", action="store_true",
                     help="show all quintiles (default: Q1-Q2 only)")
     ap.add_argument("--source", default="yahoo", choices=["set", "yahoo"])
     ap.add_argument("--no-line", action="store_true")
     ap.add_argument("--no-profile", action="store_true")
     a = ap.parse_args()
+    market.set_market(a.market)
+    if a.universe is None:
+        a.universe = market.universe_path()
 
     tickers = load_universe(a.universe)
     print(f"fetching {len(tickers)} names ...")
