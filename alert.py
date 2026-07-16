@@ -65,7 +65,10 @@ def expected_last_session(now=None):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WATCHLIST = os.path.join(HERE, "watchlist.txt")
-EQUITY = 1_000_000
+# Account equity — must match quarter.json start_equity and scan_dip's default (the positions
+# book is sized on this basis). Was 1_000_000, which made alert.py's sizes/capital 10× the real
+# 100k account.
+EQUITY = 100_000
 RISK_PCT = 1.0
 _SCAN_DATE_RE = re.compile(r"dip_scan_(\d{4}-\d{2}-\d{2})")
 MAX_VALIDATED = 30          # cap rows in the LINE "validated" section
@@ -216,6 +219,94 @@ def evaluate(sym, df, equity, risk, asof=None):
     return True, line, p
 
 
+def _eod_name(r):
+    """Ticker sans .BK, ★-prefixed for a Q1 composite leader."""
+    base = str(r.get("ticker", "")).replace(".BK", "")
+    return ("★" + base) if r.get("quintile") == 1 else base
+
+
+def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
+                     scan_date="", regime_factor=1.0, warnings=None):
+    """Analytical EOD brief (console + LINE, same style as the morning ready brief). Distills
+    the closed session into a decision — today's events (exits / T1 / new signals), portfolio
+    health (leaders, laggards, near-stop, unrealized P/L), capital, and an action line —
+    instead of dumping the full positions table. Pure state read; no refetch."""
+    holding = holding or []
+    sell_today = sell_today or []
+    t1_today = t1_today or []
+    lines = [f"📊 SET DW EOD — วิเคราะห์ {scan_date}", ""]
+
+    if warnings:
+        lines.append("\n".join(warnings) + "\n")
+    if regime_factor < 1.0:
+        lines.append(f"⚠️ ตลาด RISK-OFF → ลดขนาดโพซิชันใหม่ ×{regime_factor}\n")
+
+    # New signals — next-day limit orders (the actionable output).
+    if fired:
+        lines.append(f"🆕 สัญญาณใหม่ (BUY limit วันถัดไป): {len(fired)}")
+        for sym, p in fired[:6]:
+            nm = _eod_name({"ticker": sym, "quintile": p.get("quintile")})
+            lines.append(f"  {nm} ซื้อ {p.get('buy', p.get('close')):.2f}"
+                         f" · stop {p['stop']:.2f} · T1 {p['t1']:.2f} · size {p['size']:,}")
+        if len(fired) > 6:
+            lines.append(f"  … +{len(fired) - 6} ตัว")
+    else:
+        lines.append("🆕 ไม่มีสัญญาณ BUY ใหม่วันนี้")
+
+    # Events this session — exits and T1 promotions.
+    if sell_today or t1_today:
+        lines.append("\n📌 เหตุการณ์วันนี้:")
+        for r in sell_today:
+            reason = r.get("sell_reason", "?")
+            extra = (f" → เข้า {r['rotate_for'].replace('.BK', '')}"
+                     if reason == "ROTATE" and r.get("rotate_for") else "")
+            lines.append(f"  🔴 ขาย {_eod_name(r)} ({reason}, {r.get('pl_pct', 0):+.1f}%){extra}")
+        for r in t1_today:
+            lines.append(f"  🔵 {_eod_name(r)} ถึง T1 ({r.get('pl_pct', 0):+.1f}%)"
+                         f" → เลื่อน stop มาทุน ปล่อยวิ่ง")
+    else:
+        lines.append("\n📌 ไม่มี exit / T1 วันนี้")
+
+    # Portfolio health.
+    if holding:
+        wins = [r for r in holding if (r.get("pl_pct") or 0) > 0]
+        loss = [r for r in holding if (r.get("pl_pct") or 0) < 0]
+        unreal = sum(((r.get("cur") or 0) - (r.get("entry_close") or 0)) * (r.get("size") or 0)
+                     for r in holding)
+        lines.append(f"\n📈 พอร์ต {len(holding)} ตัว · กำไร {len(wins)} / ขาดทุน {len(loss)}"
+                     f" · unrealized ฿{unreal:,.0f}")
+        top = [r for r in sorted(holding, key=lambda r: -(r.get("pl_pct") or 0))
+               if (r.get("pl_pct") or 0) > 0][:3]
+        if top:
+            lines.append("  🏆 นำ: " + " · ".join(f"{_eod_name(r)} {r['pl_pct']:+.1f}%" for r in top))
+
+        def cushion(r):
+            cur, st = r.get("cur"), (r.get("eff_stop") or r.get("stop"))
+            return ((cur - st) / cur * 100) if cur and st and cur > 0 else 99.0
+
+        watch = sorted([r for r in holding if cushion(r) < 3.0], key=cushion)
+        if watch:
+            lines.append("  ⚠️ ใกล้ stop: "
+                         + " · ".join(f"{_eod_name(r)} (เหลือ {cushion(r):.1f}%)" for r in watch[:4]))
+
+    if capital_info:
+        lines.append(f"\n💰 ทุน: ใช้ ฿{capital_info['committed']:,.0f}"
+                     f" · เหลือ ฿{capital_info['available']:,.0f}"
+                     f" ({capital_info.get('pct_available', 0):.0f}%)")
+
+    # Action line — what actually needs the trader.
+    todo = []
+    if sell_today:
+        todo.append("ขายออก: " + ", ".join(_eod_name(r) for r in sell_today))
+    if regime_factor < 1.0:
+        todo.append("ลดไซซ์ตาม risk-off")
+    if warnings:
+        todo.append("เช็คคำเตือนข้อมูลด้านบน")
+    lines.append("\nต้องทำ: " + (" · ".join(todo) if todo else "ไม่มี — เดินตามระบบ"))
+    lines.append("★=Q1 leader · ตัวเลข = ราคาปิดล่าสุด")
+    return "\n".join(lines)
+
+
 def main():
     ap = argparse.ArgumentParser(description="SET watchlist BUY(dip) alert")
     ap.add_argument("--symbols", nargs="*", help="symbols to check (overrides watchlist.txt)")
@@ -354,25 +445,16 @@ def main():
             print(f"    {r['ticker']:10s} {r.get('status','?'):5s} "
                   f"entry {r.get('entry_close')} now {r.get('cur')} ({pl}){lead}")
 
+    # One analytical EOD brief -> console AND LINE (identical text, single formatter):
+    # events (exits / T1 / new signals) → portfolio health → capital → action line.
+    report = build_eod_report(fired, holding, sell_today, t1_today, capital_info,
+                              scan_date=scan_date, regime_factor=regime_factor,
+                              warnings=warnings)
+    print("\n" + report + "\n")
+
     if not a.no_line:
-        # ONE combined morning brief: health warnings → bull shortlist (from scan_bull) →
-        # watchlist dip + managed holdings / T1 / sell. Sections join with blank lines.
-        alert_msg = line_notify.format_alert_message(fired, scan_date=scan_date,
-                                                     holding=holding, sell_today=sell_today,
-                                                     t1_today=t1_today,
-                                                     capital_info=capital_info)
-        sections = []
-        if regime_factor < 1.0:
-            sections.append(f"⚠ ตลาด RISK-OFF (index < 200-SMA) → ลดขนาดโพซิชัน ×{regime_factor}")
-        if warnings:
-            sections.append("\n".join(warnings))
-        bull = load_bull_section(HERE)
-        if bull:
-            sections.append(bull)
-        sections.append(alert_msg)
-        combined = "\n\n".join(sections)
-        if line_notify.send_line_push(combined):
-            print(f"  LINE brief sent ({'with' if bull else 'no'} bull section).")
+        if line_notify.send_line_push(report):
+            print("  LINE EOD brief sent.")
         else:
             print("  LINE notification skipped (no credentials or send failed).")
 
