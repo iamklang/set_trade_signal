@@ -5,12 +5,13 @@ from unittest.mock import patch
 
 import pytest
 
-from viewer import _load_scans, HERE
+from viewer import _load_scans
 
 
 @pytest.fixture()
 def scan_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr("viewer.HERE", tmp_path)
+    # viewer reads dated scans from SCANS_DIR (HERE/scans); point it at the tmp dir.
+    monkeypatch.setattr("viewer.SCANS_DIR", tmp_path)
     return tmp_path
 
 

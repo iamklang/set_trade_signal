@@ -72,6 +72,8 @@ Plists อยู่ที่ `~/Library/LaunchAgents/com.klang.set-*.plist`
 
 ## Backtests
 
+อยู่ใน `backtests/` — รันด้วย path เต็ม เช่น `python backtests/bt_portfolio.py`
+
 | Script | ทดสอบอะไร |
 |---|---|
 | `bt_portfolio.py` | Portfolio-level: sizing, cap sweep, cost models |
@@ -157,6 +159,28 @@ Skills อยู่ที่ `.claude/skills/set-*/SKILL.md`
 | `quarter-review` | Quarterly review (สิ้นไตรมาส) |
 
 Agents อยู่ที่ `.claude/agents/*.md`
+
+## Project Layout
+
+```
+trading_dr/
+  *.py               core modules + daily scanners (flat — imported by name)
+  quarter.json  market_regime.json  positions.json   config/state (root)
+  set100.bk.txt  watchlist.txt  composite_rank.csv    universes/rank (root)
+  daily_scan  morning_scan  run_viewer.sh             wrapper scripts
+  backtests/         bt_*.py (research; run with full path)
+  scans/             dated outputs: dip_scan_*.csv, bull_scan_*.csv, bull_msg.txt
+  tradingview/       *.pine (TradingView indicator + strategy)
+  docs/              คู่มือ + specs/
+  data/              regenerable price cache (gitignored)
+  logs/              runtime logs (gitignored)
+  reports/           quarterly HTML
+  tests/             pytest suite
+  .claude/           skills/ + agents/
+```
+
+Core `.py` modules stay flat at the root (they import each other by name and are
+run directly by the launchd jobs) — only research, outputs, and docs are foldered.
 
 ## Tests
 

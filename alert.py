@@ -70,6 +70,8 @@ WATCHLIST = os.path.join(HERE, "watchlist.txt")
 # 100k account.
 EQUITY = 100_000
 RISK_PCT = 1.0
+# Dated scan outputs + the bull->alert handoff live under scans/, not the repo root.
+SCANS_DIR = os.path.join(HERE, "scans")
 _SCAN_DATE_RE = re.compile(r"dip_scan_(\d{4}-\d{2}-\d{2})")
 MAX_VALIDATED = 30          # cap rows in the LINE "validated" section
 
@@ -82,7 +84,7 @@ def load_validated_candidates(here, exclude=None, limit=MAX_VALIDATED):
     sorted newest scan_date first, truncated to `limit`."""
     exclude = exclude or set()
     best = {}
-    for fpath in glob.glob(os.path.join(here, "dip_scan_*.csv")):
+    for fpath in glob.glob(os.path.join(here, "scans", "dip_scan_*.csv")):
         m = _SCAN_DATE_RE.search(os.path.basename(fpath))
         if not m:
             continue
@@ -133,7 +135,7 @@ def load_composite_ranks(here, max_age_h=48):
 def load_bull_section(here, max_age_h=12):
     """Read the bull-scan section written by scan_bull (bull_msg.txt) so the alert can fold it
     into one combined LINE brief. Returns '' if missing or older than max_age_h (stale)."""
-    path = os.path.join(here, "bull_msg.txt")
+    path = os.path.join(here, "scans", "bull_msg.txt")
     if not os.path.exists(path):
         return ""
     if max_age_h and (time.time() - os.path.getmtime(path)) / 3600 > max_age_h:

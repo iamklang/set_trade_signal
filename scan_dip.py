@@ -32,6 +32,10 @@ import set_data
 import profiles
 import costs
 
+HERE = os.path.dirname(os.path.abspath(__file__))
+# Dated scan outputs (dip_scan_*.csv / bull_scan_*.csv) live under scans/, not the repo root.
+SCANS_DIR = os.path.join(HERE, "scans")
+
 
 def prune_scan_dupes(here):
     """Keep only the newest dip_scan_*.csv per scan-date; delete older same-date duplicates
@@ -535,25 +539,25 @@ def main():
           "(SKILL §1–§4b) before acting. Data is EOD; mechanical signal alone is ~break-even.\n")
 
     # CSV — include run timestamp so repeated scans don't overwrite
+    os.makedirs(SCANS_DIR, exist_ok=True)
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     if hits:
-        csv_path = a.csv or f"dip_scan_{asof_str}_{run_ts}.csv"
+        csv_path = a.csv or os.path.join(SCANS_DIR, f"dip_scan_{asof_str}_{run_ts}.csv")
         rows = [{"ticker": t, **{k: ("|".join(v) if k == "signals" and isinstance(v, list)
                                      else round(v, 4) if isinstance(v, float) else v)
                                  for k, v in p.items()}} for t, p in hits]
         pd.DataFrame(rows).to_csv(csv_path, index=False)
         print(f"  saved {csv_path}\n")
     else:
-        csv_path = a.csv or f"dip_scan_{asof_str}_{run_ts}.csv"
+        csv_path = a.csv or os.path.join(SCANS_DIR, f"dip_scan_{asof_str}_{run_ts}.csv")
         pd.DataFrame(columns=["ticker"]).iloc[:0].to_csv(csv_path, index=False)
         print(f"  saved {csv_path} (no signals)\n")
 
     # Housekeeping: one dip_scan CSV per date (drop same-day dupes) + keep only recent dates,
     # before validating.
     import housekeeping
-    _here = os.path.dirname(os.path.abspath(__file__))
-    pruned = prune_scan_dupes(_here)
-    pruned += housekeeping.retain_newest(os.path.join(_here, "dip_scan_*.csv"), keep=40)
+    pruned = prune_scan_dupes(SCANS_DIR)
+    pruned += housekeeping.retain_newest(os.path.join(SCANS_DIR, "dip_scan_*.csv"), keep=40)
     if pruned:
         print(f"  pruned {pruned} old/duplicate scan file(s)")
 

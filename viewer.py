@@ -21,6 +21,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
 HERE = Path(__file__).resolve().parent
+SCANS_DIR = HERE / "scans"          # dated dip_scan_*.csv outputs
 PORT = 8050
 
 app = FastAPI()
@@ -47,7 +48,7 @@ class _CsvHandler(FileSystemEventHandler):
 def _start_watcher():
     handler = _CsvHandler()
     observer = Observer()
-    observer.schedule(handler, str(HERE), recursive=False)
+    observer.schedule(handler, str(SCANS_DIR), recursive=False)
     observer.daemon = True
     observer.start()
 
@@ -67,13 +68,13 @@ def _parse_filename(name: str):
     if m.group(2):
         run_time = datetime.strptime(m.group(2), "%Y%m%d_%H%M%S").isoformat()
     else:
-        ts = os.path.getmtime(os.path.join(HERE, name))
+        ts = os.path.getmtime(os.path.join(SCANS_DIR, name))
         run_time = datetime.fromtimestamp(ts).isoformat()
     return scan_date, run_time
 
 
 def _load_scans():
-    files = sorted(glob.glob(str(HERE / "dip_scan_*.csv")), reverse=True)
+    files = sorted(glob.glob(str(SCANS_DIR / "dip_scan_*.csv")), reverse=True)
     scans = []
     for fpath in files:
         name = os.path.basename(fpath)

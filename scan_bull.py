@@ -38,6 +38,8 @@ except Exception:
     _CAL = None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Dated scan outputs + the bull->alert handoff (bull_msg.txt) live under scans/, not the root.
+SCANS_DIR = os.path.join(HERE, "scans")
 
 
 def load_universe(path):
@@ -218,7 +220,8 @@ def main():
     msg = line_notify.format_bull_message(shortlist, len(tickers), trend_total,
                                           tally, scan_date=asof_str)
     try:
-        with open(os.path.join(HERE, "bull_msg.txt"), "w") as f:
+        os.makedirs(SCANS_DIR, exist_ok=True)
+        with open(os.path.join(SCANS_DIR, "bull_msg.txt"), "w") as f:
             f.write(msg)
     except OSError:
         pass
@@ -231,7 +234,8 @@ def main():
         print("  bull section saved to bull_msg.txt (LINE suppressed — folded into alert)")
 
     # CSV
-    csv_path = a.csv or os.path.join(HERE, f"bull_scan_{asof_str}.csv")
+    os.makedirs(SCANS_DIR, exist_ok=True)
+    csv_path = a.csv or os.path.join(SCANS_DIR, f"bull_scan_{asof_str}.csv")
     rows = [{"ticker": t, "asof": asof_str, "quintile": p.get("quintile"),
              "composite": p.get("comp"), "close": p["close"], "distPct": round(p["distPct"], 2),
              "rsi": round(p["rsi"], 1), "adx": round(p["adx"], 1), "stop": p["stop"],
@@ -241,7 +245,7 @@ def main():
                                 "rsi", "adx", "stop", "t1", "t2", "size", "signals"]).to_csv(csv_path, index=False)
     print(f"\n  saved {os.path.basename(csv_path)}\n")
     import housekeeping
-    housekeeping.retain_newest(os.path.join(HERE, "bull_scan_*.csv"), keep=30)
+    housekeeping.retain_newest(os.path.join(SCANS_DIR, "bull_scan_*.csv"), keep=30)
 
 
 if __name__ == "__main__":

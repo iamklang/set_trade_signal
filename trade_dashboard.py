@@ -32,7 +32,8 @@ PORT = 8060
 # ---------------------------------------------------------------- helpers
 
 def _latest_csv(pattern):
-    files = sorted(glob.glob(os.path.join(HERE, pattern)), reverse=True)
+    # Dated scan CSVs live under scans/ (dip_scan_*.csv / bull_scan_*.csv).
+    files = sorted(glob.glob(os.path.join(HERE, "scans", pattern)), reverse=True)
     return files[0] if files else None
 
 

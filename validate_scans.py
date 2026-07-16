@@ -96,7 +96,7 @@ def main():
     if a.file:
         files = [a.file]
     else:
-        files = sorted(glob.glob(os.path.join(HERE, "dip_scan_*.csv")))
+        files = sorted(glob.glob(os.path.join(HERE, "scans", "dip_scan_*.csv")))
 
     if not files:
         print("no dip_scan_*.csv files found.")

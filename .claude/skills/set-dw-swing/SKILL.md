@@ -47,7 +47,7 @@ chase into resistance. Execute as a **patient limit trader on liquid names**.
 
 ## TradingView scripts (Pine v6)
 
-Two companion scripts in the project root:
+Two companion scripts in `tradingview/`:
 
 - **`set-dw-swing.pine`** — live indicator (add to any SET stock or DW chart).
 - **`set-dw-swing-strategy.pine`** — backtest version (run on a SET stock, Daily).
