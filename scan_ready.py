@@ -124,39 +124,79 @@ def classify(df, t, cfg):
     return out
 
 
+def _almost_tag(missing_item: str) -> str:
+    """Short Thai reason tag for an ALMOST blocker (RSI/ADX momentum gap vs price proximity)."""
+    if "RSI" in missing_item:
+        return "รอ RSI"
+    if "ADX" in missing_item:
+        return "รอ ADX"
+    return "รอย่อ/ทะลุ"
+
+
 def build_report(ready, scan_date="", n_names=0, all_quintiles=False, in_trend=0):
-    """Single source of truth for the morning ready-list brief — the SAME text is printed to
-    the console AND pushed to LINE (no divergence). This is ONLY the morning-ready result:
-    the DIP/BRK/ALMOST groups (close/RSI/ADX/stop/T1 + the trigger condition), a ready/almost
-    tally, and the legend. Position management (holdings, sells, capital) is out of scope here
-    — that belongs to the EOD alert (alert.py) and the eod-monitor."""
-    lines = [f"SET DW Ready List | as of {scan_date} | {n_names} names"
-             + ("" if all_quintiles else " | Q1-Q2 only"), ""]
+    """Analytical morning brief (console + LINE, identical text). Rather than dumping every
+    ready row, distill the scan into a decision: market breadth, the Q1 breakout names CLOSEST
+    to triggering (rank by distance-to-high), the quality dip setups, imminent Q2 breakouts,
+    and momentum/overbought risk flags. Pure ready-list analysis — no positions state, so the
+    brief stands alone (may include a name already held; that's the trader's cross-check)."""
+    dip = [r for r in ready if r["category"] == "DIP_READY"]
+    brk = [r for r in ready if r["category"] == "BRK_READY"]
+    almost = [r for r in ready if r["category"] == "ALMOST"]
 
-    cats = {"DIP_READY": "DIP READY", "BRK_READY": "BRK READY", "ALMOST": "ALMOST"}
-    any_ready = False
-    for cat_key, cat_label in cats.items():
-        group = [r for r in ready if r["category"] == cat_key]
-        if not group:
-            continue
-        any_ready = True
-        lines.append(f"  === {cat_label} ({len(group)}) ===")
-        for r in group:
-            q = f"Q{r['quintile']}" if r.get("quintile") else " - "
-            nm = r["ticker"].replace(".BK", "")
-            star = "★" if r.get("quintile") == 1 else " "
-            lines.append(f"  {star}{nm:11s}{q:>3s}  close {r['close']:>8.2f}  RSI {r['rsi']:>4.0f}"
-                         f"  ADX {r['adx']:>4.0f}  stop {r['stop']:>8.2f}  T1 {r['t1']:>8.2f}"
-                         f"  | {', '.join(r['missing'])}")
-        lines.append("")
+    def nm(r):
+        return r["ticker"].replace(".BK", "")
 
-    if not any_ready:
-        lines.append("  ไม่มีตัวใกล้ trigger วันนี้\n")
+    def q1(rows):
+        return [r for r in rows if r.get("quintile") == 1]
 
-    total_ready = len([r for r in ready if r["category"] in ("DIP_READY", "BRK_READY")])
-    n_almost = len([r for r in ready if r["category"] == "ALMOST"])
-    lines.append(f"  {total_ready} ready + {n_almost} almost (out of {in_trend} in-trend names)")
-    lines.append("  ★=Q1 leader · DIP=ย่อชน EMA เด้ง · BRK=ทะลุ high 20 วัน")
+    lines = [f"📊 SET DW Ready — วิเคราะห์ {scan_date}"
+             + ("" if all_quintiles else " (Q1-Q2)"), ""]
+
+    breadth = f"ตลาด: {in_trend}/{n_names} ขาขึ้น"
+    if n_names and in_trend >= 0.4 * n_names:
+        breadth += " (บูลกว้าง)"
+    lines.append(breadth)
+    lines.append(f"พร้อม {len(dip) + len(brk)} ({len(dip)} dip / {len(brk)} brk) + ใกล้ {len(almost)}")
+
+    if not (dip or brk):
+        lines.append("\nวันนี้ไม่มีตัวพร้อมเข้า — เฝ้ารอบถัดไป")
+        return "\n".join(lines)
+
+    # Q1 breakouts, closest-to-trigger first (most imminent).
+    brk_q1 = sorted(q1(brk), key=lambda r: r["dist_high_pct"])
+    if brk_q1:
+        lines.append("\n🎯 Q1 เบรกใกล้สุด — รอปิดทะลุ + volume:")
+        for i, r in enumerate(brk_q1[:5], 1):
+            away = "at high" if r["dist_high_pct"] <= 0 else f"+{r['dist_high_pct']:.1f}%"
+            ob = " ⚠OB" if r["rsi"] >= 78 else ""
+            lines.append(f" {i}. {nm(r):7s} >{r['prior_high']:.2f} ({away})"
+                         f" · ADX {r['adx']:.0f} RSI {r['rsi']:.0f} · stop {r['stop']:.2f} T1 {r['t1']:.2f}{ob}")
+
+    # Q1 dips — ranked by trend strength.
+    dip_q1 = sorted(q1(dip), key=lambda r: -r["adx"])
+    if dip_q1:
+        lines.append("\n🟢 Q1 dip คุณภาพ (รอแท่งเขียว + volume):")
+        lines.append("  " + " · ".join(f"★{nm(r)} {r['close']:.2f} (ADX{r['adx']:.0f})"
+                                        for r in dip_q1[:4]))
+
+    # Imminent Q2 breakouts already at a fresh high.
+    q2_athigh = [nm(r) for r in brk if r.get("quintile") == 2 and r["dist_high_pct"] <= 0]
+    if q2_athigh:
+        lines.append(f"\n🔵 Q2 ทะลุพร้อม (at high): {' '.join(q2_athigh)}")
+
+    # Momentum risk flag across all ready names.
+    ob = [nm(r) for r in dip + brk if r["rsi"] >= 78]
+    if ob:
+        lines.append(f"\n⚠️ Overbought RSI≥78 (อย่าไล่ราคา): {' '.join(ob)}")
+
+    # ALMOST names one momentum filter away (price is in position, just needs RSI/ADX).
+    near = [r for r in q1(almost) if len(r["missing"]) == 1
+            and ("RSI" in r["missing"][0] or "ADX" in r["missing"][0])]
+    if near:
+        lines.append("⏳ ใกล้เข้า (ขาดโมเมนตัมนิดเดียว): "
+                     + " · ".join(f"{nm(r)} ({_almost_tag(r['missing'][0])})" for r in near[:4]))
+
+    lines.append("\n★=Q1 leader · เข้าเมื่อ trigger + volume เท่านั้น อย่าไล่ราคา")
     return "\n".join(lines)
 
 
