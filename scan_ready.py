@@ -30,7 +30,6 @@ import setdw_signal as sig
 import bullish_signals as bull
 import set_data
 import profiles
-import positions as pos
 import line_notify
 
 BREAKOUT_NEAR_PCT = 2.0
@@ -125,54 +124,39 @@ def classify(df, t, cfg):
     return out
 
 
-def format_line_message(ready, scan_date="", holding=None, sell_today=None,
-                        t1_today=None, capital_info=None):
-    header = "SET DW Ready List"
-    if scan_date:
-        header += f" ({scan_date})"
-    lines = [header, ""]
+def build_report(ready, scan_date="", n_names=0, all_quintiles=False, in_trend=0):
+    """Single source of truth for the morning ready-list brief — the SAME text is printed to
+    the console AND pushed to LINE (no divergence). This is ONLY the morning-ready result:
+    the DIP/BRK/ALMOST groups (close/RSI/ADX/stop/T1 + the trigger condition), a ready/almost
+    tally, and the legend. Position management (holdings, sells, capital) is out of scope here
+    — that belongs to the EOD alert (alert.py) and the eod-monitor."""
+    lines = [f"SET DW Ready List | as of {scan_date} | {n_names} names"
+             + ("" if all_quintiles else " | Q1-Q2 only"), ""]
 
-    dip = [r for r in ready if r["category"] == "DIP_READY"]
-    brk = [r for r in ready if r["category"] == "BRK_READY"]
-    almost = [r for r in ready if r["category"] == "ALMOST"]
-
-    def nm(r):
-        q = r.get("quintile")
-        base = r["ticker"].replace(".BK", "")
-        return ("★" + base) if q == 1 else base
-
-    if dip:
-        lines.append(f"🟢 DIP READY ({len(dip)}) — green bar + vol = ไฟร์:")
-        for r in dip:
-            lines.append(f"  {nm(r):10s} RSI {r['rsi']:>4.0f}  ADX {r['adx']:>4.0f}"
-                         f"  EMA {r['ema']:.2f} ({r['dist_pct']:+.1f}%)"
-                         f"  stop {r['stop']:.2f}  T1 {r['t1']:.2f}")
+    cats = {"DIP_READY": "DIP READY", "BRK_READY": "BRK READY", "ALMOST": "ALMOST"}
+    any_ready = False
+    for cat_key, cat_label in cats.items():
+        group = [r for r in ready if r["category"] == cat_key]
+        if not group:
+            continue
+        any_ready = True
+        lines.append(f"  === {cat_label} ({len(group)}) ===")
+        for r in group:
+            q = f"Q{r['quintile']}" if r.get("quintile") else " - "
+            nm = r["ticker"].replace(".BK", "")
+            star = "★" if r.get("quintile") == 1 else " "
+            lines.append(f"  {star}{nm:11s}{q:>3s}  close {r['close']:>8.2f}  RSI {r['rsi']:>4.0f}"
+                         f"  ADX {r['adx']:>4.0f}  stop {r['stop']:>8.2f}  T1 {r['t1']:>8.2f}"
+                         f"  | {', '.join(r['missing'])}")
         lines.append("")
 
-    if brk:
-        lines.append(f"🔵 BRK READY ({len(brk)}) — ทะลุ high + vol = ไฟร์:")
-        for r in brk:
-            lines.append(f"  {nm(r):10s} RSI {r['rsi']:>4.0f}  ADX {r['adx']:>4.0f}"
-                         f"  high {r['prior_high']:.2f} ({r['dist_high_pct']:+.1f}%)"
-                         f"  stop {r['stop']:.2f}  T1 {r['t1']:.2f}")
-        lines.append("")
+    if not any_ready:
+        lines.append("  ไม่มีตัวใกล้ trigger วันนี้\n")
 
-    if almost:
-        lines.append(f"⚪ ALMOST ({len(almost)}) — ขาดอีกนิด:")
-        for r in almost:
-            lines.append(f"  {nm(r):10s} ขาด: {', '.join(r['missing'])}")
-        lines.append("")
-
-    if not dip and not brk and not almost:
-        lines.append("ไม่มีตัวใกล้ trigger วันนี้")
-
-    lines.append("★=Q1 leader · DIP=ย่อชน EMA เด้ง · BRK=ทะลุ high 20 วัน")
-
-    section = line_notify.format_positions_section(
-        holding, sell_today, t1_today, capital_info=capital_info)
-    if section:
-        lines.append("")
-        lines.append(section)
+    total_ready = len([r for r in ready if r["category"] in ("DIP_READY", "BRK_READY")])
+    n_almost = len([r for r in ready if r["category"] == "ALMOST"])
+    lines.append(f"  {total_ready} ready + {n_almost} almost (out of {in_trend} in-trend names)")
+    lines.append("  ★=Q1 leader · DIP=ย่อชน EMA เด้ง · BRK=ทะลุ high 20 วัน")
     return "\n".join(lines)
 
 
@@ -216,61 +200,17 @@ def main():
     ready.sort(key=lambda r: ({"DIP_READY": 0, "BRK_READY": 1, "ALMOST": 2}[r["category"]],
                                r.get("quintile") or 99))
 
-    print(f"\nSET DW Ready List | as of {scan_date} | {a.universe} ({len(tickers)} names)"
-          + ("" if a.all_quintiles else " | Q1-Q2 only") + "\n")
-
-    cats = {"DIP_READY": "DIP READY", "BRK_READY": "BRK READY", "ALMOST": "ALMOST"}
-    for cat_key, cat_label in cats.items():
-        group = [r for r in ready if r["category"] == cat_key]
-        if not group:
-            continue
-        print(f"  === {cat_label} ({len(group)}) ===")
-        for r in group:
-            q = f"Q{r['quintile']}" if r.get("quintile") else " - "
-            nm = r["ticker"].replace(".BK", "")
-            star = "★" if r.get("quintile") == 1 else " "
-            print(f"  {star}{nm:11s}{q:>3s}  close {r['close']:>8.2f}  RSI {r['rsi']:>4.0f}"
-                  f"  ADX {r['adx']:>4.0f}  stop {r['stop']:>8.2f}  T1 {r['t1']:>8.2f}"
-                  f"  | {', '.join(r['missing'])}")
-        print()
-
-    total_ready = len([r for r in ready if r["category"] in ("DIP_READY", "BRK_READY")])
-    print(f"  {total_ready} ready + {len([r for r in ready if r['category'] == 'ALMOST'])} almost"
-          f" (out of {len(results)} in-trend names)")
-
-    pstate = pos.load()
-    holding, t1_today, sell_today = pos.holding_view(pstate, asof=scan_date or None)
-    for r in holding + t1_today + sell_today:
-        r["quintile"] = ranks.get(r["ticker"])
-    committed = pos.committed_capital(pstate)
-    equity = 100_000
-    avail_cap = max(0, equity - committed)
-    capital_info = {"equity": equity, "committed": committed,
-                    "available": avail_cap,
-                    "pct_available": avail_cap / equity * 100 if equity > 0 else 0}
-
-    if sell_today or t1_today or holding:
-        print("\n  managed watchlist (positions.json):")
-        for r in sell_today:
-            print(f"    🔴 {r['ticker']:10s} SELL {r.get('sell_reason','?')} — {pos.sell_note(r.get('sell_reason'))}")
-        for r in t1_today:
-            print(f"    🔵 {r['ticker']:10s} T1 — {pos.t1_note()}")
-        for r in holding:
-            pl = f"{r['pl_pct']:+.1f}%" if r.get("pl_pct") is not None else "n/a"
-            lead = " ★Q1" if r.get("quintile") == 1 else ""
-            print(f"    {r['ticker']:10s} {r.get('status','?'):5s} "
-                  f"entry {r.get('entry_close')} now {r.get('cur')} ({pl}){lead}")
+    # One report -> console AND LINE (identical text, single formatter). Morning-ready result
+    # only — the ready-list; position management lives in alert.py / eod-monitor, not here.
+    report = build_report(ready, scan_date or "", n_names=len(tickers),
+                          all_quintiles=a.all_quintiles, in_trend=len(results))
+    print("\n" + report + "\n")
 
     if not a.no_line:
-        msg = format_line_message(ready, scan_date or "",
-                                  holding=holding, sell_today=sell_today,
-                                  t1_today=t1_today, capital_info=capital_info)
-        if line_notify.send_line_push(msg):
+        if line_notify.send_line_push(report):
             print("  LINE ready-list sent.")
         else:
             print("  LINE skipped (no credentials or send failed).")
-
-    print()
 
 
 if __name__ == "__main__":

@@ -15,29 +15,61 @@ from urllib.error import URLError
 
 LINE_API_URL = "https://api.line.me/v2/bot/message/push"
 
+# LINE hard-limits a text message to 5000 chars and a push request to 5 message objects.
+# Stay a touch under the char cap for safety headroom.
+LINE_TEXT_LIMIT = 4900
+LINE_MSGS_PER_PUSH = 5
+
+
+def _chunk_text(text: str, limit: int = LINE_TEXT_LIMIT) -> list[str]:
+    """Split `text` into ≤`limit`-char pieces on line boundaries (so a table/row is never cut
+    mid-line). A single over-long line is hard-split as a last resort. Preserves order."""
+    chunks, buf = [], ""
+    for line in text.split("\n"):
+        piece = (buf + "\n" + line) if buf else line
+        if len(piece) <= limit:
+            buf = piece
+            continue
+        if buf:
+            chunks.append(buf)
+            buf = ""
+        while len(line) > limit:        # a lone line longer than the limit — hard split
+            chunks.append(line[:limit])
+            line = line[limit:]
+        buf = line
+    if buf:
+        chunks.append(buf)
+    return chunks or [""]
+
 
 def send_line_push(text: str) -> bool:
+    """Push `text` to the configured LINE group. Long text is split across multiple message
+    bubbles (line-aligned) and batched into pushes of ≤5 messages, so the full brief is
+    delivered intact instead of truncated at 5000 chars. Returns True only if every batch sent."""
     token = os.environ.get("LINE_CHANNEL_TOKEN", "")
     group_id = os.environ.get("LINE_GROUP_ID", "")
     if not token or not group_id:
         return False
 
-    body = json.dumps({
-        "to": group_id,
-        "messages": [{"type": "text", "text": text[:5000]}],
-    }).encode()
-
-    req = Request(LINE_API_URL, data=body, headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
-    })
-
-    try:
-        with urlopen(req) as resp:
-            return resp.status == 200
-    except (URLError, OSError) as e:
-        print(f"  [LINE] send failed: {e}")
-        return False
+    chunks = _chunk_text(text)
+    ok = True
+    for i in range(0, len(chunks), LINE_MSGS_PER_PUSH):
+        batch = chunks[i:i + LINE_MSGS_PER_PUSH]
+        body = json.dumps({
+            "to": group_id,
+            "messages": [{"type": "text", "text": c} for c in batch],
+        }).encode()
+        req = Request(LINE_API_URL, data=body, headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        })
+        try:
+            with urlopen(req) as resp:
+                ok = ok and resp.status == 200
+        except (URLError, OSError) as e:
+            print(f"  [LINE] send failed: {e}")
+            ok = False
+    return ok
 
 
 def _fmt_num(x, width=8):
