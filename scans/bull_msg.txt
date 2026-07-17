@@ -1,7 +1,7 @@
 SET Bull Scan (2026-07-17)
 
-ตลาด: 61/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 2  brk 7  gld 1
+ตลาด: 62/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 3  brk 9  gld 1
 
 ★ Q1 leader + trigger (6):
 Ticker  sig          Buy     Stop       T1     Size
