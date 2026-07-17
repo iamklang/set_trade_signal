@@ -1,13 +1,22 @@
-SET Bull Scan (2026-07-16)
+SET Bull Scan (2026-07-17)
 
-ตลาด: 65/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 3  brk 17  rcl 4
+ตลาด: 61/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 2  brk 7  gld 1
 
-★ Q1 leader + trigger (1):
+★ Q1 leader + trigger (6):
 Ticker  sig          Buy     Stop       T1     Size
 ---------------------------------------------------
-IRPC    brk         2.00     1.83     2.17    8,700
+GUNKUL  brk         5.30     4.34     6.26    1,500*
+IRPC    brk         2.14     1.84     2.44    4,900*
+TOP     brk        62.00    48.50    75.50        0*
+BGRIM   brk        20.20    17.80    22.60      600*
+GPSC    brk        54.50    46.25    62.75      100*
+GULF    brk        67.50    61.25    73.75      100
 
 Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
+
+วิเคราะห์:
+- ระวังยืด >10% (รอย่อ/ลดไซซ์): GUNKUL*, IRPC*, TOP*, BGRIM*, GPSC*
+- overbought RSI≥78: GUNKUL, TOP, GPSC
 
 ★=Q1 leader  *=ยืด >10% เหนือ EMA
