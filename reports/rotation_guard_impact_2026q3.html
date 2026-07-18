@@ -1,0 +1,749 @@
+<title>Rotation Guard Impact — 2026Q3</title>
+<style>
+  /* ── tokens ── */
+  :root {
+    --surface-page:    #0f1218;
+    --surface-card:    #171d27;
+    --surface-card-alt:#1c2333;
+    --border:          rgba(255,255,255,0.06);
+    --ink-primary:     #e4e2dc;
+    --ink-secondary:   #8b8a85;
+    --ink-muted:       #5c5b57;
+    --gain:            #34d399;
+    --gain-bg:         rgba(52,211,153,0.08);
+    --loss:            #f87171;
+    --loss-bg:         rgba(248,113,113,0.08);
+    --blocked:         #60a5fa;
+    --blocked-bg:      rgba(96,165,250,0.07);
+    --guard-winner:    #a78bfa;
+    --guard-young:     #38bdf8;
+    --highlight-bar:   rgba(96,165,250,0.15);
+  }
+  @media (prefers-color-scheme: light) {
+    :root:where(:not([data-theme="dark"])) {
+      --surface-page:    #f3f2ef;
+      --surface-card:    #ffffff;
+      --surface-card-alt:#fafaf8;
+      --border:          rgba(0,0,0,0.08);
+      --ink-primary:     #1a1a1a;
+      --ink-secondary:   #6b6a65;
+      --ink-muted:       #a3a29d;
+      --gain:            #16a34a;
+      --gain-bg:         rgba(22,163,74,0.06);
+      --loss:            #dc2626;
+      --loss-bg:         rgba(220,38,38,0.06);
+      --blocked:         #2563eb;
+      --blocked-bg:      rgba(37,99,235,0.05);
+      --guard-winner:    #7c3aed;
+      --guard-young:     #0284c7;
+      --highlight-bar:   rgba(37,99,235,0.08);
+    }
+  }
+  :root[data-theme="light"] {
+    --surface-page:    #f3f2ef;
+    --surface-card:    #ffffff;
+    --surface-card-alt:#fafaf8;
+    --border:          rgba(0,0,0,0.08);
+    --ink-primary:     #1a1a1a;
+    --ink-secondary:   #6b6a65;
+    --ink-muted:       #a3a29d;
+    --gain:            #16a34a;
+    --gain-bg:         rgba(22,163,74,0.06);
+    --loss:            #dc2626;
+    --loss-bg:         rgba(220,38,38,0.06);
+    --blocked:         #2563eb;
+    --blocked-bg:      rgba(37,99,235,0.05);
+    --guard-winner:    #7c3aed;
+    --guard-young:     #0284c7;
+    --highlight-bar:   rgba(37,99,235,0.08);
+  }
+  :root[data-theme="dark"] {
+    --surface-page:    #0f1218;
+    --surface-card:    #171d27;
+    --surface-card-alt:#1c2333;
+    --border:          rgba(255,255,255,0.06);
+    --ink-primary:     #e4e2dc;
+    --ink-secondary:   #8b8a85;
+    --ink-muted:       #5c5b57;
+    --gain:            #34d399;
+    --gain-bg:         rgba(52,211,153,0.08);
+    --loss:            #f87171;
+    --loss-bg:         rgba(248,113,113,0.08);
+    --blocked:         #60a5fa;
+    --blocked-bg:      rgba(96,165,250,0.07);
+    --guard-winner:    #a78bfa;
+    --guard-young:     #38bdf8;
+    --highlight-bar:   rgba(96,165,250,0.15);
+  }
+
+  /* ── reset & base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--surface-page);
+    color: var(--ink-primary);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    padding: 2rem 1rem 3rem;
+  }
+
+  /* ── layout ── */
+  .container { max-width: 920px; margin: 0 auto; }
+
+  /* ── header ── */
+  .page-header {
+    margin-bottom: 2.25rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .page-header h1 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.35rem;
+  }
+  .page-header .subtitle {
+    font-size: 0.8125rem;
+    color: var(--ink-secondary);
+    line-height: 1.4;
+  }
+  .page-header .subtitle span {
+    display: inline-block;
+    margin-right: 1.25rem;
+  }
+
+  /* ── stat tiles ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 2.25rem;
+  }
+  .stat-tile {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.125rem;
+  }
+  .stat-tile .label {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 0.35rem;
+  }
+  .stat-tile .value {
+    font-size: 1.75rem;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+  .stat-tile .delta {
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+  }
+  .stat-tile .value.gain { color: var(--gain); }
+  .stat-tile .value.loss { color: var(--loss); }
+  .stat-tile .value.blocked { color: var(--blocked); }
+  .stat-tile .delta.gain { color: var(--gain); }
+  .stat-tile .delta.loss { color: var(--loss); }
+
+  /* ── section heading ── */
+  .section-heading {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    padding-top: 0.25rem;
+  }
+  .section-sub {
+    font-size: 0.8125rem;
+    color: var(--ink-secondary);
+    margin-bottom: 1rem;
+  }
+
+  /* ── table ── */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-card);
+    margin-bottom: 2.25rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.8125rem;
+  }
+  thead th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-muted);
+    padding: 0.625rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: var(--surface-card);
+  }
+  thead th.r { text-align: right; }
+  tbody td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td.r { text-align: right; }
+  tbody td.ticker {
+    font-weight: 600;
+    color: var(--ink-primary);
+  }
+  .pl-gain { color: var(--gain); font-weight: 600; }
+  .pl-loss { color: var(--loss); font-weight: 600; }
+  .pl-flat { color: var(--ink-muted); }
+
+  /* guard badges */
+  .guard-badge {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+    letter-spacing: 0.02em;
+  }
+  .guard-badge.both {
+    background: linear-gradient(135deg, rgba(167,139,250,0.15), rgba(96,165,250,0.15));
+    color: var(--guard-winner);
+  }
+  .guard-badge.young {
+    background: rgba(56,189,248,0.12);
+    color: var(--guard-young);
+  }
+
+  /* outcome badge */
+  .outcome {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 3px;
+  }
+  .outcome.win {
+    background: var(--gain-bg);
+    color: var(--gain);
+  }
+  .outcome.lose {
+    background: var(--loss-bg);
+    color: var(--loss);
+  }
+  .outcome.flat {
+    background: rgba(139,138,133,0.08);
+    color: var(--ink-muted);
+  }
+
+  /* ── impact cards ── */
+  .impact-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 2.25rem;
+  }
+  @media (max-width: 600px) {
+    .impact-grid { grid-template-columns: 1fr; }
+  }
+  .impact-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem 1.125rem;
+  }
+  .impact-card .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+  }
+  .impact-card .card-ticker {
+    font-weight: 700;
+    font-size: 0.875rem;
+  }
+  .impact-card .card-detail {
+    font-size: 0.75rem;
+    color: var(--ink-secondary);
+    line-height: 1.6;
+  }
+  .impact-card .card-detail strong {
+    color: var(--ink-primary);
+    font-weight: 600;
+  }
+
+  /* ── bar chart (horizontal) ── */
+  .bar-chart {
+    margin-bottom: 2.25rem;
+  }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.375rem;
+  }
+  .bar-label {
+    width: 90px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: right;
+    flex-shrink: 0;
+    color: var(--ink-primary);
+  }
+  .bar-track {
+    flex: 1;
+    height: 22px;
+    background: var(--surface-card-alt);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px 0 0 4px;
+    min-width: 2px;
+    transition: width 0.4s ease;
+  }
+  .bar-fill.gain { background: var(--gain); opacity: 0.65; }
+  .bar-fill.loss { background: var(--loss); opacity: 0.65; }
+  .bar-fill.flat { background: var(--ink-muted); opacity: 0.35; }
+  .bar-fill.full { border-radius: 4px; }
+  .bar-value {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    width: 58px;
+    flex-shrink: 0;
+  }
+
+  /* ── bottom line ── */
+  .bottom-line {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+  }
+  .bottom-line h3 {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+  .bottom-line p {
+    font-size: 0.8125rem;
+    color: var(--ink-secondary);
+    line-height: 1.7;
+    margin-bottom: 0.5rem;
+  }
+  .bottom-line .verdict {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--gain);
+    margin-top: 0.75rem;
+  }
+  .bottom-line .verdict-detail {
+    font-size: 0.8125rem;
+    color: var(--ink-secondary);
+    margin-top: 0.25rem;
+  }
+
+  /* ── guard legend ── */
+  .guard-legend {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: var(--ink-secondary);
+    margin-bottom: 1.5rem;
+  }
+  .guard-legend .leg-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .leg-dot {
+    width: 8px; height: 8px; border-radius: 2px;
+  }
+  .leg-dot.winner { background: var(--guard-winner); }
+  .leg-dot.young  { background: var(--guard-young); }
+</style>
+
+<div class="container">
+
+  <!-- Header -->
+  <header class="page-header">
+    <h1>Rotation Guard Impact</h1>
+    <div class="subtitle">
+      <span>SET DW Swing / 2026-Q3</span>
+      <span>ROTATE exits only</span>
+      <span>Data through 2026-07-17</span>
+    </div>
+  </header>
+
+  <!-- Stat tiles -->
+  <div class="stat-row">
+    <div class="stat-tile">
+      <div class="label">Total Rotate Exits</div>
+      <div class="value">8</div>
+      <div class="delta" style="color:var(--ink-secondary)">all hold &lt; 5 bars</div>
+    </div>
+    <div class="stat-tile">
+      <div class="label">Would Be Blocked</div>
+      <div class="value blocked">8</div>
+      <div class="delta" style="color:var(--blocked)">100% of rotations</div>
+    </div>
+    <div class="stat-tile">
+      <div class="label">Blocked &rarr; Won</div>
+      <div class="value gain">6</div>
+      <div class="delta gain">counterfactual P/L &gt; 0</div>
+    </div>
+    <div class="stat-tile">
+      <div class="label">Avg Counterfactual P/L</div>
+      <div class="value gain">+3.07%</div>
+      <div class="delta gain">vs 0% realized at exit</div>
+    </div>
+  </div>
+
+  <!-- Guard legend -->
+  <div class="guard-legend">
+    <div class="leg-item"><div class="leg-dot winner"></div>Winner guard &mdash; cur &gt; entry (cannot rotate a winner)</div>
+    <div class="leg-item"><div class="leg-dot young"></div>Min-hold guard &mdash; hold &lt; 5 bars (too young to rotate)</div>
+  </div>
+
+  <!-- Trade-by-trade table -->
+  <h2 class="section-heading">Trade-by-Trade Detail</h2>
+  <p class="section-sub">Every ROTATE exit in Q3. Guard column shows which rule would have blocked the rotation.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Ticker</th>
+          <th>Entry</th>
+          <th>Exit</th>
+          <th class="r">Hold</th>
+          <th class="r">Entry Px</th>
+          <th class="r">Cur@Exit</th>
+          <th class="r">P/L@Exit</th>
+          <th>Guard</th>
+          <th class="r">Max After</th>
+          <th class="r">Latest Px</th>
+          <th class="r">CF P/L</th>
+          <th>Outcome</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- BCP.BK — biggest winner -->
+        <tr>
+          <td class="ticker">BCP.BK</td>
+          <td>07-13</td>
+          <td>07-13</td>
+          <td class="r">0</td>
+          <td class="r">37.50</td>
+          <td class="r">37.50</td>
+          <td class="r pl-flat">0.00%</td>
+          <td><span class="guard-badge young">MIN-HOLD</span></td>
+          <td class="r pl-gain">42.50</td>
+          <td class="r">42.50</td>
+          <td class="r pl-gain">+13.33%</td>
+          <td><span class="outcome win">Won</span></td>
+        </tr>
+        <!-- IRPC.BK -->
+        <tr>
+          <td class="ticker">IRPC.BK</td>
+          <td>07-16</td>
+          <td>07-17</td>
+          <td class="r">1</td>
+          <td class="r">2.00</td>
+          <td class="r">2.14</td>
+          <td class="r pl-gain">+7.00%</td>
+          <td><span class="guard-badge both">BOTH</span></td>
+          <td class="r pl-gain">2.14</td>
+          <td class="r">2.14</td>
+          <td class="r pl-gain">+7.00%</td>
+          <td><span class="outcome win">Won</span></td>
+        </tr>
+        <!-- SCC.BK -->
+        <tr>
+          <td class="ticker">SCC.BK</td>
+          <td>07-13</td>
+          <td>07-13</td>
+          <td class="r">0</td>
+          <td class="r">250.00</td>
+          <td class="r">250.00</td>
+          <td class="r pl-flat">0.00%</td>
+          <td><span class="guard-badge young">MIN-HOLD</span></td>
+          <td class="r pl-gain">256.00</td>
+          <td class="r">254.00</td>
+          <td class="r pl-gain">+1.60%</td>
+          <td><span class="outcome win">Won</span></td>
+        </tr>
+        <!-- PTT.BK -->
+        <tr>
+          <td class="ticker">PTT.BK</td>
+          <td>07-14</td>
+          <td>07-15</td>
+          <td class="r">1</td>
+          <td class="r">38.25</td>
+          <td class="r">38.75</td>
+          <td class="r pl-gain">+1.31%</td>
+          <td><span class="guard-badge both">BOTH</span></td>
+          <td class="r pl-gain">38.75</td>
+          <td class="r">38.75</td>
+          <td class="r pl-gain">+1.31%</td>
+          <td><span class="outcome win">Won</span></td>
+        </tr>
+        <!-- PRM.BK -->
+        <tr>
+          <td class="ticker">PRM.BK</td>
+          <td>07-15</td>
+          <td>07-16</td>
+          <td class="r">1</td>
+          <td class="r">9.20</td>
+          <td class="r">9.40</td>
+          <td class="r pl-gain">+2.17%</td>
+          <td><span class="guard-badge both">BOTH</span></td>
+          <td class="r pl-gain">9.40</td>
+          <td class="r">9.30</td>
+          <td class="r pl-gain">+1.09%</td>
+          <td><span class="outcome win">Won</span></td>
+        </tr>
+        <!-- PTTEP.BK -->
+        <tr>
+          <td class="ticker">PTTEP.BK</td>
+          <td>07-14</td>
+          <td>07-16</td>
+          <td class="r">2</td>
+          <td class="r">144.00</td>
+          <td class="r">143.50</td>
+          <td class="r pl-loss">-0.35%</td>
+          <td><span class="guard-badge young">MIN-HOLD</span></td>
+          <td class="r pl-gain">145.50</td>
+          <td class="r">145.50</td>
+          <td class="r pl-gain">+1.04%</td>
+          <td><span class="outcome win">Won</span></td>
+        </tr>
+        <!-- BANPU.BK -->
+        <tr>
+          <td class="ticker">BANPU.BK</td>
+          <td>07-14</td>
+          <td>07-16</td>
+          <td class="r">2</td>
+          <td class="r">5.80</td>
+          <td class="r">5.80</td>
+          <td class="r pl-flat">0.00%</td>
+          <td><span class="guard-badge young">MIN-HOLD</span></td>
+          <td class="r pl-flat">5.80</td>
+          <td class="r">5.80</td>
+          <td class="r pl-flat">0.00%</td>
+          <td><span class="outcome flat">Flat</span></td>
+        </tr>
+        <!-- ADVANC.BK -->
+        <tr>
+          <td class="ticker">ADVANC.BK</td>
+          <td>07-14</td>
+          <td>07-16</td>
+          <td class="r">2</td>
+          <td class="r">382.00</td>
+          <td class="r">375.00</td>
+          <td class="r pl-loss">-1.83%</td>
+          <td><span class="guard-badge young">MIN-HOLD</span></td>
+          <td class="r">379.00</td>
+          <td class="r">379.00</td>
+          <td class="r pl-loss">-0.79%</td>
+          <td><span class="outcome lose">Lost</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Counterfactual P/L bar chart -->
+  <h2 class="section-heading">Counterfactual P/L If Held to Latest</h2>
+  <p class="section-sub">How each position performed after the premature rotation exit.</p>
+
+  <div class="bar-chart">
+    <div class="bar-row">
+      <div class="bar-label">BCP.BK</div>
+      <div class="bar-track"><div class="bar-fill gain full" style="width:100%"></div></div>
+      <div class="bar-value pl-gain">+13.33%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">IRPC.BK</div>
+      <div class="bar-track"><div class="bar-fill gain full" style="width:52.5%"></div></div>
+      <div class="bar-value pl-gain">+7.00%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">SCC.BK</div>
+      <div class="bar-track"><div class="bar-fill gain full" style="width:12%"></div></div>
+      <div class="bar-value pl-gain">+1.60%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">PTT.BK</div>
+      <div class="bar-track"><div class="bar-fill gain full" style="width:9.8%"></div></div>
+      <div class="bar-value pl-gain">+1.31%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">PRM.BK</div>
+      <div class="bar-track"><div class="bar-fill gain full" style="width:8.2%"></div></div>
+      <div class="bar-value pl-gain">+1.09%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">PTTEP.BK</div>
+      <div class="bar-track"><div class="bar-fill gain full" style="width:7.8%"></div></div>
+      <div class="bar-value pl-gain">+1.04%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">BANPU.BK</div>
+      <div class="bar-track"><div class="bar-fill flat" style="width:2%"></div></div>
+      <div class="bar-value pl-flat">0.00%</div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">ADVANC.BK</div>
+      <div class="bar-track"><div class="bar-fill loss full" style="width:5.9%"></div></div>
+      <div class="bar-value pl-loss">-0.79%</div>
+    </div>
+  </div>
+
+  <!-- Impact analysis cards -->
+  <h2 class="section-heading">Impact Analysis per Trade</h2>
+  <p class="section-sub">For each blocked rotation: what happened next and what the guard saved.</p>
+
+  <div class="impact-grid">
+    <!-- BCP -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker" style="color:var(--gain)">BCP.BK</span>
+        <span class="outcome win">Won +13.33%</span>
+      </div>
+      <div class="card-detail">
+        Rotated out at <strong>37.50</strong> after <strong>0 bars</strong> (same-day exit).
+        Price rallied to <strong>42.50</strong> over 4 bars after exit.
+        Guard would have saved <strong>+13.33%</strong> of upside.
+        The biggest missed move in the dataset.
+      </div>
+    </div>
+    <!-- IRPC -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker" style="color:var(--gain)">IRPC.BK</span>
+        <span class="outcome win">Won +7.00%</span>
+      </div>
+      <div class="card-detail">
+        Winner at exit (<strong>2.14</strong> vs entry <strong>2.00</strong>).
+        Both guards triggered: cur &gt; entry and hold = 1 bar.
+        Latest price still at <strong>2.14</strong>. Full gain preserved.
+      </div>
+    </div>
+    <!-- SCC -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker" style="color:var(--gain)">SCC.BK</span>
+        <span class="outcome win">Won +1.60%</span>
+      </div>
+      <div class="card-detail">
+        Rotated out flat at <strong>250</strong> after <strong>0 bars</strong>.
+        Rose to <strong>256</strong> by bar 3, pulled back to <strong>254</strong> latest.
+        Guard saves +1.60% vs the flat exit.
+      </div>
+    </div>
+    <!-- PTT -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker" style="color:var(--gain)">PTT.BK</span>
+        <span class="outcome win">Won +1.31%</span>
+      </div>
+      <div class="card-detail">
+        Winner at exit (<strong>38.75</strong> vs entry <strong>38.25</strong>).
+        Both guards triggered. Price held steady at <strong>38.75</strong>.
+        Gain fully preserved by blocking.
+      </div>
+    </div>
+    <!-- PRM -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker" style="color:var(--gain)">PRM.BK</span>
+        <span class="outcome win">Won +1.09%</span>
+      </div>
+      <div class="card-detail">
+        Winner at exit (<strong>9.40</strong>) but slipped to <strong>9.30</strong> latest.
+        Still above entry (<strong>9.20</strong>). Both guards triggered.
+        Would give back some gain but stay profitable.
+      </div>
+    </div>
+    <!-- PTTEP -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker" style="color:var(--gain)">PTTEP.BK</span>
+        <span class="outcome win">Won +1.04%</span>
+      </div>
+      <div class="card-detail">
+        Was losing at exit (<strong>143.50</strong> vs entry <strong>144</strong>).
+        Recovered to <strong>145.50</strong> by next bar.
+        Guard flips a -0.35% loser into a +1.04% winner.
+      </div>
+    </div>
+    <!-- BANPU -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker">BANPU.BK</span>
+        <span class="outcome flat">Flat 0.00%</span>
+      </div>
+      <div class="card-detail">
+        Exited flat at <strong>5.80</strong>, still flat at latest.
+        Guard has no impact here. No harm, no benefit.
+      </div>
+    </div>
+    <!-- ADVANC -->
+    <div class="impact-card">
+      <div class="card-header">
+        <span class="card-ticker" style="color:var(--loss)">ADVANC.BK</span>
+        <span class="outcome lose">Lost -0.79%</span>
+      </div>
+      <div class="card-detail">
+        Loser at exit (<strong>375</strong> vs entry <strong>382</strong>, -1.83%).
+        Recovered partially to <strong>379</strong>. Guard would reduce the loss
+        from -1.83% to -0.79%. Still a loss, but a smaller one.
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom line -->
+  <div class="bottom-line">
+    <h3>Bottom Line</h3>
+    <p>
+      All 8 ROTATE exits in Q3 had a hold time of 0-2 bars &mdash; every single one would
+      be blocked by the min-hold guard alone. 3 of the 8 were also winners at exit, so the
+      winner guard provides a second layer.
+    </p>
+    <p>
+      Of the 8 blocked trades: <strong>6 went on to win</strong> (counterfactual P/L &gt; 0 at latest),
+      <strong>1 still lost</strong> (ADVANC, but the loss shrank from -1.83% to -0.79%),
+      and <strong>1 stayed flat</strong> (BANPU).
+    </p>
+    <p>
+      The standout case is <strong>BCP.BK</strong>: rotated out at entry price on the same day,
+      then rallied +13.33% over the next 4 bars. This single trade accounts for more than half
+      of the total counterfactual gain.
+    </p>
+    <div class="verdict">
+      Net verdict: guards are strongly positive (+3.07% avg counterfactual P/L across all 8 trades)
+    </div>
+    <div class="verdict-detail">
+      6/8 blocked trades went on to win &bull;
+      1/8 reduced its loss &bull;
+      1/8 neutral &bull;
+      0/8 made worse by blocking
+    </div>
+  </div>
+
+</div>
