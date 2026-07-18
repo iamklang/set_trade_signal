@@ -55,6 +55,7 @@ MAX_POSITIONS = 12     # default cap on concurrent holdings (keep the strongest 
 # only ~3 bars, which let live re-enter earlier than the measured edge); falls back to calendar
 # days when exchange_calendars is unavailable.
 COOLDOWN_BARS = 5
+MIN_HOLD_BARS = 5      # minimum bars before a position can be rotated out
 _COOLDOWN_KEY = "_cooldown"           # reserved top-level key: {ticker: date_last_dropped}
 
 try:
@@ -81,6 +82,20 @@ def _bars_since(then, now):
         except Exception:
             pass
     return _days_since(then, now)
+
+
+def _rotation_eligible(rec, asof_date):
+    """A position can be rotated out only if it is not in profit AND has been held
+    long enough.  Winners (P/L > 0) are protected so the right tail can develop;
+    young positions (< MIN_HOLD_BARS) haven't had time to show their edge yet."""
+    entry = rec.get("entry_date")
+    if not entry or _bars_since(entry, asof_date) < MIN_HOLD_BARS:
+        return False
+    cur = rec.get("cur") or 0
+    entry_px = rec.get("entry_close") or 0
+    if entry_px and cur > entry_px:
+        return False
+    return True
 
 
 def load(path=None):
@@ -204,7 +219,8 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
                    (COOLDOWN_BARS trading sessions since a full exit; tickers, reason not distinguished)"""
     positions = {t: dict(r) for t, r in positions.items()}
     fired_today = {t for t, _ in fresh_hits}
-    trans = {"holding": [], "t1_today": [], "sell_today": [], "dropped": [], "skipped": []}
+    trans = {"holding": [], "t1_today": [], "sell_today": [], "dropped": [], "skipped": [],
+             "over_cap": []}
 
     # 1) Drop names flagged on a PRIOR run ("remove next day") — starts their cooldown.
     cooldown = positions.get(_COOLDOWN_KEY, {})
@@ -295,9 +311,11 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
             rec["status"] = RUN if phase == RUN else "HOLD"
 
     # 4) Position cap — hold only the strongest `max_positions` by composite + opportunity.
-    #    A weak new entry is silently skipped; an over-cap EXISTING holding rotates out.
+    #    A weak new entry is silently skipped; an over-cap EXISTING holding rotates out
+    #    ONLY if it is rotation-eligible (not in profit, held long enough).
     if max_positions and ranks is not None:
-        held = [t for t, r in positions.items() if r.get("state") == HOLDING]
+        held = [t for t, r in positions.items()
+                if isinstance(r, dict) and r.get("state") == HOLDING and t != _COOLDOWN_KEY]
         if len(held) > max_positions:
             held.sort(key=lambda t: (ranks.get(t, float("-inf")),
                                      opportunity_score(positions[t])), reverse=True)
@@ -305,12 +323,18 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
                 if t in added:
                     del positions[t]
                     trans["skipped"].append(t)
-                else:
+                elif _rotation_eligible(positions[t], asof_date):
                     _flag_sell(positions[t], "ROTATE", asof_date)
                     trans["sell_today"].append({**positions[t], "ticker": t})
+            still_held = [t for t in held if t in positions and positions[t].get("state") == HOLDING]
+            if len(still_held) > max_positions:
+                protected = [t for t in still_held[max_positions:]
+                             if not _rotation_eligible(positions[t], asof_date)]
+                trans["over_cap"] = protected
 
     # 4b) Proactive rotation: even at cap (not over), swap the weakest incumbent if a new
     #     candidate has clearly better forward opportunity (upside to T1 > incumbent + 5%).
+    #     Only rotation-eligible incumbents (not in profit, held long enough) can be swapped.
     OPP_THRESHOLD = 0.05
     if max_positions and ranks is not None:
         held_all = [t for t, r in positions.items()
@@ -319,7 +343,8 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
                        if t in positions and positions[t].get("state") == HOLDING]
         if len(held_all) >= max_positions and new_entries:
             incumbents = {t: opportunity_score(positions[t])
-                          for t in held_all if t not in added}
+                          for t in held_all
+                          if t not in added and _rotation_eligible(positions[t], asof_date)}
             if incumbents:
                 weakest_t = min(incumbents, key=incumbents.get)
                 weakest_opp = incumbents[weakest_t]
@@ -342,7 +367,7 @@ def update(positions, fresh_hits, frames, asof_date, ranks=None, max_positions=N
 
 def opportunity_score(rec):
     """Forward-looking: remaining % gain to T1 (FULL) or EMA trail cushion (RUN)."""
-    px = rec.get("cur") or rec.get("close") or rec.get("buy")
+    px = rec.get("cur") or rec.get("buy")
     t1 = rec.get("t1")
     if not px or not t1 or px <= 0:
         return 0.0

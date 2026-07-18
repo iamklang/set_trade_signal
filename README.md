@@ -184,6 +184,12 @@ Slash commands สำหรับใช้ใน Claude Code — แต่ละ
 | `/us-risk` | Sizing (lot 1), exits, PDT rule, assignment |
 | `/us-evidence` | อะไร validate/ยังไม่ validate บน US, ความเสี่ยง |
 
+**Dev workflow:**
+
+| Skill | ใช้เมื่อ |
+|---|---|
+| `/spec-driven-feature` | Spec-Driven Development — scaffold/spec/plan/tasks for a new feature (github/spec-kit) |
+
 Skills อยู่ที่ `.claude/skills/set-*/SKILL.md`
 
 ## Agents

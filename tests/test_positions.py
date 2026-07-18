@@ -163,13 +163,14 @@ def _many(tickers, px=10.0):
 
 
 def test_cap_rotates_weakest_existing():
-    """With 3 held and cap 2, the lowest-composite EXISTING name rotates out (ROTATE)."""
+    """With 3 held and cap 2, the lowest-composite EXISTING name rotates out (ROTATE)
+    once it has been held past MIN_HOLD_BARS and is not in profit."""
     hits = [_hit("A.BK"), _hit("B.BK"), _hit("C.BK")]
     frames = _many(["A.BK", "B.BK", "C.BK"])
     ranks = {"A.BK": 3.0, "B.BK": 2.0, "C.BK": 1.0}
-    # seed all three (day 1, no cap so they enter), then apply cap on day 2
     state, _ = pos.update({}, hits, frames, "2026-07-01")
-    state, tr = pos.update(state, [], frames, "2026-07-02", ranks=ranks, max_positions=2)
+    # advance past MIN_HOLD_BARS (5) so the guard doesn't block
+    state, tr = pos.update(state, [], frames, "2026-07-14", ranks=ranks, max_positions=2)
     assert {r["ticker"] for r in tr["holding"]} == {"A.BK", "B.BK"}
     assert [r["ticker"] for r in tr["sell_today"]] == ["C.BK"]
     assert state["C.BK"]["sell_reason"] == "ROTATE"
@@ -340,16 +341,17 @@ def test_opportunity_score_missing_data():
 # ---- proactive rotation ------------------------------------------------------------------
 
 def test_proactive_rotation_swaps_when_better_opportunity():
-    """New entry with clearly better upside displaces the weakest incumbent."""
+    """New entry with clearly better upside displaces the weakest incumbent
+    (incumbent must be past MIN_HOLD_BARS and not in profit)."""
     # Seed 2 holdings, both near their T1 (low opportunity)
     state, _ = pos.update({}, [_hit("A.BK", close=10.9, stop=9.0, t1=11.0),
                                _hit("B.BK", close=10.8, stop=9.0, t1=11.0)],
                           _many(["A.BK", "B.BK"]), "2026-07-01",
                           ranks={"A.BK": 2.0, "B.BK": 1.0}, max_positions=2)
-    # New entry with fresh upside: close=10, t1=11 -> 10% opp vs ~1% for incumbents
+    # Advance past MIN_HOLD_BARS; new entry with fresh upside
     frames = {**_many(["A.BK", "B.BK"]), "C.BK": _df(10.0)}
     state, tr = pos.update(state, [_hit("C.BK", close=10.0, stop=9.0, t1=11.0)],
-                           frames, "2026-07-02",
+                           frames, "2026-07-14",
                            ranks={"A.BK": 2.0, "B.BK": 1.0, "C.BK": 1.5},
                            max_positions=2)
     rotated = [r["ticker"] for r in tr["sell_today"] if r.get("sell_reason") == "ROTATE"]
@@ -401,3 +403,109 @@ def test_opp_score_stored():
     state, _ = pos.update({}, [_hit("X.BK")], _fr(10.0), "2026-07-01")
     assert state["X.BK"]["opp_score"] is not None
     assert state["X.BK"]["opp_score"] > 0
+
+
+# ---- rotation guards: protect winners + min hold time ---------------------------
+
+def test_winner_protected_from_cap_rotation():
+    """A position in profit must not be rotated out even if it has the lowest composite."""
+    hits = [_hit("A.BK", close=10.0), _hit("B.BK", close=10.0), _hit("C.BK", close=10.0)]
+    frames = _many(["A.BK", "B.BK", "C.BK"])
+    ranks = {"A.BK": 3.0, "B.BK": 2.0, "C.BK": 1.0}
+    state, _ = pos.update({}, hits, frames, "2026-07-01")
+    # C is weakest by rank but is now in profit (cur 11 > entry 10)
+    frames_up = {t: _df(11.0) for t in ["A.BK", "B.BK", "C.BK"]}
+    # advance well past MIN_HOLD_BARS so only the profit guard is tested
+    state, tr = pos.update(state, [], frames_up, "2026-07-14", ranks=ranks, max_positions=2)
+    # C is in profit -> protected, should NOT be rotated even though over cap
+    assert state["C.BK"]["state"] == pos.HOLDING
+    assert not any(r["ticker"] == "C.BK" and r.get("sell_reason") == "ROTATE"
+                   for r in tr["sell_today"])
+
+
+def test_young_position_protected_from_cap_rotation():
+    """A position held less than MIN_HOLD_BARS must not be rotated out."""
+    hits = [_hit("A.BK"), _hit("B.BK"), _hit("C.BK")]
+    frames = _many(["A.BK", "B.BK", "C.BK"])
+    ranks = {"A.BK": 3.0, "B.BK": 2.0, "C.BK": 1.0}
+    state, _ = pos.update({}, hits, frames, "2026-07-01")
+    # Next day (1 bar held < MIN_HOLD_BARS=5), even though C is weakest
+    state, tr = pos.update(state, [], frames, "2026-07-02", ranks=ranks, max_positions=2)
+    assert state["C.BK"]["state"] == pos.HOLDING
+    assert not any(r["ticker"] == "C.BK" and r.get("sell_reason") == "ROTATE"
+                   for r in tr["sell_today"])
+
+
+def test_loser_past_min_hold_can_be_rotated():
+    """A losing position held long enough is still eligible for rotation."""
+    hits = [_hit("A.BK", close=10.0), _hit("B.BK", close=10.0), _hit("C.BK", close=10.0)]
+    frames = _many(["A.BK", "B.BK", "C.BK"])
+    ranks = {"A.BK": 3.0, "B.BK": 2.0, "C.BK": 1.0}
+    state, _ = pos.update({}, hits, frames, "2026-07-01")
+    # C is losing (cur 9.5 < entry 10) and held > MIN_HOLD_BARS
+    frames_down = {t: _df(9.5) for t in ["A.BK", "B.BK", "C.BK"]}
+    state, tr = pos.update(state, [], frames_down, "2026-07-14", ranks=ranks, max_positions=2)
+    assert state["C.BK"]["sell_reason"] == "ROTATE"
+
+
+def test_winner_protected_from_proactive_rotation():
+    """A profitable incumbent must not be proactively rotated even with better new opportunity."""
+    state, _ = pos.update({}, [_hit("A.BK", close=10.0, stop=9.0, t1=11.0),
+                               _hit("B.BK", close=10.0, stop=9.0, t1=11.0)],
+                          _many(["A.BK", "B.BK"]), "2026-07-01",
+                          ranks={"A.BK": 2.0, "B.BK": 1.0}, max_positions=2)
+    # B is now near T1 (low opp) but IN PROFIT — cur 10.9 > entry 10.0
+    for t in state:
+        if t == pos._COOLDOWN_KEY:
+            continue
+        state[t]["cur"] = 10.9
+    # Advance past MIN_HOLD_BARS
+    frames = {**_many(["A.BK", "B.BK"], px=10.9), "C.BK": _df(10.0)}
+    state, tr = pos.update(state, [_hit("C.BK", close=10.0, stop=9.0, t1=12.0)],
+                           frames, "2026-07-14",
+                           ranks={"A.BK": 2.0, "B.BK": 1.0, "C.BK": 1.5},
+                           max_positions=2)
+    rotated = [r["ticker"] for r in tr["sell_today"] if r.get("sell_reason") == "ROTATE"]
+    assert "B.BK" not in rotated
+
+
+def test_young_position_protected_from_proactive_rotation():
+    """An incumbent held < MIN_HOLD_BARS must not be proactively rotated."""
+    state, _ = pos.update({}, [_hit("A.BK", close=10.9, stop=9.0, t1=11.0),
+                               _hit("B.BK", close=10.9, stop=9.0, t1=11.0)],
+                          _many(["A.BK", "B.BK"]), "2026-07-01",
+                          ranks={"A.BK": 2.0, "B.BK": 1.0}, max_positions=2)
+    # Day 2: B is young (1 bar) and losing — should still be protected by min hold
+    frames = {**_many(["A.BK", "B.BK"]), "C.BK": _df(10.0)}
+    state, tr = pos.update(state, [_hit("C.BK", close=10.0, stop=9.0, t1=12.0)],
+                           frames, "2026-07-02",
+                           ranks={"A.BK": 2.0, "B.BK": 1.0, "C.BK": 1.5},
+                           max_positions=2)
+    rotated = [r["ticker"] for r in tr["sell_today"] if r.get("sell_reason") == "ROTATE"]
+    assert "B.BK" not in rotated
+
+
+def test_missing_entry_date_protected_from_rotation():
+    """A position without entry_date must not be rotated (treated as too young)."""
+    hits = [_hit("A.BK"), _hit("B.BK"), _hit("C.BK")]
+    frames = _many(["A.BK", "B.BK", "C.BK"])
+    ranks = {"A.BK": 3.0, "B.BK": 2.0, "C.BK": 1.0}
+    state, _ = pos.update({}, hits, frames, "2026-07-01")
+    del state["C.BK"]["entry_date"]
+    frames_down = {t: _df(9.5) for t in ["A.BK", "B.BK", "C.BK"]}
+    state, tr = pos.update(state, [], frames_down, "2026-07-14", ranks=ranks, max_positions=2)
+    assert state["C.BK"]["state"] == pos.HOLDING
+    assert not any(r["ticker"] == "C.BK" and r.get("sell_reason") == "ROTATE"
+                   for r in tr["sell_today"])
+
+
+def test_over_cap_reported_when_all_protected():
+    """When over-cap positions are all protected, trans['over_cap'] lists them."""
+    hits = [_hit("A.BK", close=10.0), _hit("B.BK", close=10.0), _hit("C.BK", close=10.0)]
+    frames = _many(["A.BK", "B.BK", "C.BK"])
+    ranks = {"A.BK": 3.0, "B.BK": 2.0, "C.BK": 1.0}
+    state, _ = pos.update({}, hits, frames, "2026-07-01")
+    frames_up = {t: _df(11.0) for t in ["A.BK", "B.BK", "C.BK"]}
+    state, tr = pos.update(state, [], frames_up, "2026-07-14", ranks=ranks, max_positions=2)
+    assert len(tr["over_cap"]) >= 1
+    assert all(t in state and state[t]["state"] == pos.HOLDING for t in tr["over_cap"])
