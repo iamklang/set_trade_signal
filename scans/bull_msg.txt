@@ -1,5 +1,19 @@
-SET Bull Scan (2026-07-21)
+SET Bull Scan (2026-07-22)
 
-ตลาด: 0/100 ขาขึ้น
+ตลาด: 56/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 2  brk 7
 
-วันนี้ไม่มี Q1 leader ที่มี trigger เข้าใหม่
+★ Q1 leader + trigger (3):
+Ticker  sig          Buy     Stop       T1     Size
+---------------------------------------------------
+IRPC    brk         2.30     1.84     2.76    3,100*
+SPRC    brk         9.85     8.00    11.70      700*
+PTTGC   brk        40.25    33.50    47.00      100*
+
+Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
+
+วิเคราะห์:
+- ระวังยืด >10% (รอย่อ/ลดไซซ์): IRPC*, SPRC*, PTTGC*
+- overbought RSI≥78: IRPC, SPRC, PTTGC
+
+★=Q1 leader  *=ยืด >10% เหนือ EMA
