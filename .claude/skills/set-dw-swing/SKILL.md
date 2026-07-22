@@ -21,6 +21,7 @@ backtests on SET100.
 | Skill | Covers | Trigger examples |
 |---|---|---|
 | `/set-macro` | Macro regime, index trend, sector leadership | "ใครแบก", "SET recap", "oil impact" |
+| `/set-pullback` | Pre-signal radar: grade a pullback (healthy vs fake), ready-list | "ตัวไหนกำลังจะเข้า", "ย่อสวยหรือแลบหลอก" |
 | `/set-entry` | Per-stock chart plan, entry rules, signals | "should I buy X", "entry/stop/target" |
 | `/set-earnings` | Earnings overlay: งบ, sell-on-fact, SC, IV crush | "งบ season", "SC play", "pre-print" |
 | `/set-dw` | DW selection: delta, gearing, IV, expiry | "which DW series", "compare DWs" |

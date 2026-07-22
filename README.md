@@ -166,6 +166,7 @@ Slash commands สำหรับใช้ใน Claude Code — แต่ละ
 |---|---|
 | `/set-dw-swing` | Master index — คำถามกว้างๆ หรือ full workflow |
 | `/set-macro` | Macro regime, index trend, sector leadership ("ใครแบก") |
+| `/set-pullback` | Pre-signal radar: เกรด pullback (ย่อสวย vs แลบหลอก vs post-spike fade) + ready-list |
 | `/set-entry` | Chart plan, entry/stop/target สำหรับหุ้นเฉพาะตัว |
 | `/set-earnings` | งบ season: consensus, sell-on-fact, SC, IV crush |
 | `/set-dw` | เลือก DW series: delta, effective gearing, IV, expiry |
