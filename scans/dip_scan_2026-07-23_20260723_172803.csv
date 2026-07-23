@@ -1,0 +1,6 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+TCAP.BK,73.0,73.0,69.5,3.5,76.5,78.25,200,3.785,63.3279,63.6693,dip,0.286,200,1.25,1.0,2,True,confirmed,2026-07-23 17:28
+KKP.BK,118.5,118.5,102.5,16.0,134.5,142.5,0,12.3923,79.6614,59.9319,breakout,1.714,0,1.5,1.0,1,False,no-fresh-dip,2026-07-23 17:28
+PTTEP.BK,151.5,151.5,138.5,13.0,164.5,171.0,0,6.493,73.9561,35.5575,breakout,-0.119,0,1.0,1.0,3,False,no-fresh-dip,2026-07-23 17:28
+PRM.BK,9.85,9.85,9.0,0.85,10.7,11.125,0,6.9215,74.0474,32.5918,breakout,0.564,1100,1.25,1.0,2,False,no-fresh-dip,2026-07-23 17:28
+STA.BK,19.4,19.4,17.8,1.6,21.0,21.8,0,5.3207,64.9588,28.5424,breakout,0.465,600,1.25,1.0,2,False,not-green,2026-07-23 17:28
