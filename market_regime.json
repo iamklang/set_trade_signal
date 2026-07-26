@@ -3,12 +3,12 @@
   "factor": 1.0,
   "voltgt": 1.0,
   "ddbrake": 1.0,
-  "mkt_vol": 0.1584,
-  "dd": -0.0171,
-  "equity": 98863.0,
+  "mkt_vol": 0.1594,
+  "dd": -0.0106,
+  "equity": 99511.0,
   "peak": 100579.0,
   "risk_off": false,
-  "index": 1.2406,
-  "sma": 1.0305,
+  "index": 1.2389,
+  "sma": 1.0283,
   "brake_enabled": true
 }

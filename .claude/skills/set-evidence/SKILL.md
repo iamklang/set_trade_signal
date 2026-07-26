@@ -19,6 +19,8 @@ After stress-testing every tempting idea on BOTH a 10y and 5y window:
 
 **Validated core:**
 - Buy-the-dip (mean-reversion) entry
+- **Volume confirmation at entry** (Volume > 20d avg) — the single most
+  load-bearing gate: turning it OFF drops 5y Sharpe 0.81→0.21 (see below)
 - Composite mom+trend leader ranking
 - Let-winners-run exit (breakeven at +1R, trail the EMA after, no target cap)
 - ~12-name cap
@@ -34,6 +36,9 @@ After stress-testing every tempting idea on BOTH a 10y and 5y window:
 - Fractional-Kelly / inverse-vol sizing (backfires: high-vol names ARE the high-edge leaders)
 - `close < EMA` exit before +1R (cut ~84% of trades early, PF 0.75 — net loser)
 - CDC ActionZone entry (failed 5y OOS backtest)
+- **Volume-surge filter `vol_mult > 1`** (demand vol > 1.2–2× avg, not just
+  above avg): best-everything on 10y but degrades 5y CAGR + drawdown — a 10y
+  mirage, same overfit shape as breakout-only. Keep `vol_mult = 1.0`.
 
 ## Key numbers
 
@@ -53,6 +58,26 @@ After stress-testing every tempting idea on BOTH a 10y and 5y window:
 - **Thin 2-tick names**: PF < 1 (edge dies)
 - Execution style + name liquidity matter MORE than the signal
 - Always place a limit at the signal close — never chase a gap up
+
+## Volume confirmation — the load-bearing gate (2026-07-24 sweep)
+
+`vol_mult` sweep on the live config (dip_or_brk + quintile + combo + tickliq,
+cap 12), applied to BOTH the dip and breakout legs, on 10y AND recent-5y:
+
+| vol_mult | 10y Sharpe / CAGR / PF | 5y Sharpe / CAGR / PF |
+|---|---|---|
+| **off** (no gate) | 0.77 / 10.3% / 1.59 | **0.21 / 2.0% / 1.16** |
+| **1.0 (live)** | 1.07 / 15.9% / 1.76 | **0.81 / 11.7% / 1.40** |
+| 1.5 | 1.00 / 14.2% / 1.83 | 0.81 / 10.7% / 1.37 |
+| 2.0 | 1.11 / 16.6% / 1.99 | 0.73 / 9.3% / 1.29 |
+
+- **Volume confirmation ≈ the whole recent edge.** Off → 5y is barely above zero
+  (Sharpe 0.21). On (vm=1.0) → Sharpe 0.81. Never disable it.
+- **Don't raise vol_mult above 1.0.** 10y loves vm=2.0 (best everything) but 5y
+  best CAGR/DD is at 1.0 and every step up degrades both — reject as a 10y mirage.
+- Higher vm raises hit% (fewer, cleaner signals) but trims right-tail winners +
+  worsens 5y DD → net negative. "High-vol names ARE the high-edge leaders."
+- Script: `scratchpad/bt_volmult.py` (re-run at quarterly review if regime shifts).
 
 ## Academic evidence on the SET
 
