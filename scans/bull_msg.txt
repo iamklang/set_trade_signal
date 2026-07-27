@@ -1,20 +1,18 @@
-SET Bull Scan (2026-07-24)
+SET Bull Scan (2026-07-27)
 
-ตลาด: 47/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 3  brk 5  rcl 2  gld 1
+ตลาด: 53/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 6  brk 5  rcl 9  gld 1
 
-★ Q1 leader + trigger (4):
+★ Q1 leader + trigger (2):
 Ticker  sig          Buy     Stop       T1     Size
 ---------------------------------------------------
-SPRC    brk        10.50     8.05    12.95      600*
-KTB     brk        43.50    40.25    46.75      400
-TTB     brk         3.02     2.60     3.44    3,400*
-PRM     brk        10.10     9.00    11.20    1,300
+KKP     brk       120.00   104.00   136.00        0*
+TTB     brk         3.08     2.60     3.56    3,000*
 
 Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
 
 วิเคราะห์:
-- ระวังยืด >10% (รอย่อ/ลดไซซ์): SPRC*, TTB*
-- overbought RSI≥78: SPRC, TTB
+- ระวังยืด >10% (รอย่อ/ลดไซซ์): KKP*, TTB*
+- overbought RSI≥78: KKP, TTB
 
 ★=Q1 leader  *=ยืด >10% เหนือ EMA
