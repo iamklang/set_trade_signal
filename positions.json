@@ -1,4 +1,33 @@
 {
+  "AOT.BK": {
+    "adx": 28.0,
+    "cur": 64.0,
+    "eff_stop": 60.5,
+    "ema20": 62.93,
+    "entry_close": 64.0,
+    "entry_date": "2026-07-27",
+    "first_seen": "2026-07-27",
+    "flagged_date": null,
+    "init_stop": 60.5,
+    "last_seen": "2026-07-27",
+    "opp_score": 0.0547,
+    "phase": "FULL",
+    "pl_pct": 0.0,
+    "quintile": 2,
+    "regime_mult": 1.0,
+    "rsi": 58.0,
+    "signals": [
+      "dip"
+    ],
+    "size": 100,
+    "size_mult": 1.25,
+    "state": "HOLDING",
+    "status": "HOLD",
+    "stop": 60.5,
+    "t1": 67.5,
+    "t1_date": null,
+    "t2": 69.25
+  },
   "BCP.BK": {
     "adx": 39.0,
     "cur": 44.25,
@@ -128,7 +157,7 @@
     "init_stop": 100.46,
     "last_seen": "2026-07-27",
     "opp_score": 0,
-    "phase": "FULL",
+    "phase": "RUN",
     "pl_pct": 9.6,
     "quintile": 1,
     "regime_mult": 1.0,
@@ -139,10 +168,10 @@
     "size": 100,
     "size_mult": 1.5,
     "state": "HOLDING",
-    "status": "HOLD",
-    "stop": 100.46,
+    "status": "RUN",
+    "stop": 109.5,
     "t1": 118.54,
-    "t1_date": null,
+    "t1_date": "2026-07-27",
     "t2": 123.06
   },
   "KTB.BK": {

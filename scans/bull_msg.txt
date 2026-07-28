@@ -1,18 +1,17 @@
 SET Bull Scan (2026-07-27)
 
 ตลาด: 53/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 6  brk 5  rcl 9  gld 1
+trigger: dip 5  brk 3  rcl 9  gld 1
 
-★ Q1 leader + trigger (2):
+★ Q1 leader + trigger (1):
 Ticker  sig          Buy     Stop       T1     Size
 ---------------------------------------------------
-KKP     brk       120.00   104.00   136.00        0*
 TTB     brk         3.08     2.60     3.56    3,000*
 
 Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
 
 วิเคราะห์:
-- ระวังยืด >10% (รอย่อ/ลดไซซ์): KKP*, TTB*
-- overbought RSI≥78: KKP, TTB
+- ระวังยืด >10% (รอย่อ/ลดไซซ์): TTB*
+- overbought RSI≥78: TTB
 
 ★=Q1 leader  *=ยืด >10% เหนือ EMA
