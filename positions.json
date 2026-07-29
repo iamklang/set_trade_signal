@@ -148,7 +148,7 @@
   "KKP.BK": {
     "adx": 57.0,
     "cur": 120.0,
-    "eff_stop": 100.46,
+    "eff_stop": 109.5,
     "ema20": 107.9,
     "entry_close": 109.5,
     "entry_date": "2026-07-20",
@@ -156,7 +156,7 @@
     "flagged_date": null,
     "init_stop": 100.46,
     "last_seen": "2026-07-27",
-    "opp_score": 0,
+    "opp_score": 0.1008,
     "phase": "RUN",
     "pl_pct": 9.6,
     "quintile": 1,
