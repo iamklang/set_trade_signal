@@ -1,0 +1,5 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+TCAP.BK,86.75,86.75,70.75,16.0,102.75,110.75,0,14.8456,78.9249,58.9988,breakout,0.918,0,1.5,1.0,1,False,"not-green, no-fresh-dip",2026-08-05 17:02
+KTC.BK,39.25,39.25,37.5,1.75,41.0,41.875,200,3.3863,67.6734,42.1029,dip,0.347,200,1.25,1.0,2,True,confirmed,2026-08-05 17:02
+GFPT.BK,9.95,9.95,9.4,0.55,10.5,10.775,300,4.1044,69.0168,34.8132,breakout,-0.834,1100,0.5,1.0,5,False,no-fresh-dip,2026-08-05 17:02
+CPALL.BK,49.5,49.5,46.0,3.5,53.0,54.75,0,4.4187,70.4774,15.9503,breakout,-0.571,200,0.75,1.0,4,False,"no-fresh-dip, adx 16<20",2026-08-05 17:02
