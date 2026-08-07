@@ -1,18 +1,6 @@
-SET Bull Scan (2026-08-05)
+SET Bull Scan (2026-08-07)
 
-ตลาด: 56/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 1  brk 3  rcl 1
+ตลาด: 53/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 2  rcl 3  gld 1
 
-★ Q1 leader + trigger (2):
-Ticker  sig          Buy     Stop       T1     Size
----------------------------------------------------
-HANA    rcl        37.25    33.00    41.50      300
-TCAP    brk        86.75    70.75   102.75        0*
-
-Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
-
-วิเคราะห์:
-- ระวังยืด >10% (รอย่อ/ลดไซซ์): TCAP*
-- overbought RSI≥78: TCAP
-
-★=Q1 leader  *=ยืด >10% เหนือ EMA
+วันนี้ไม่มี Q1 leader ที่มี trigger เข้าใหม่
