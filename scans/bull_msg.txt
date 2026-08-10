@@ -1,6 +1,6 @@
-SET Bull Scan (2026-08-07)
+SET Bull Scan (2026-08-10)
 
-ตลาด: 53/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 2  rcl 3  gld 1
+ตลาด: 47/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 1  brk 1
 
 วันนี้ไม่มี Q1 leader ที่มี trigger เข้าใหม่
