@@ -211,6 +211,12 @@ def evaluate(sym, df, equity, risk, asof=None):
                        f"NO SIGNAL ({', '.join(reasons) or 'setup incomplete'})"), None
 
     p = sig.trade_plan(row, equity, risk)
+    # Enrich for the EOD brief's detailed signal block: volume-confirmation multiple (the
+    # signal demands Volume>volSma, so this is ≥1) and the EMA20 the dip bounced off (the
+    # lower bound of the "or better" buy zone).
+    vsma = float(row["volSma"]) if pd.notna(row["volSma"]) else 0.0
+    p["vol_x"] = (float(row["Volume"]) / vsma) if vsma else None
+    p["ema"] = float(row["ema"])
     line = (f"{sym:10s} | bar {bar} close {close:.2f} | *** BUY(dip) *** "
             f"stop {p['stop']:.2f} T1 {p['t1']:.2f} T2 {p['t2']:.2f} size {p['size']:,} "
             f"| RSI {p['rsi']:.0f} ADX {p['adx']:.0f}")
@@ -221,6 +227,42 @@ def _eod_name(r):
     """Ticker sans .BK, ★-prefixed for a Q1 composite leader."""
     base = str(r.get("ticker", "")).replace(".BK", "")
     return ("★" + base) if r.get("quintile") == 1 else base
+
+
+def _fmt_signal_detail(sym, p):
+    """Three-line detail for one fired BUY(dip) signal in the EOD brief:
+      1) headline — setup + trend context (dist above EMA20, 200-day up) + RSI/ADX + vol confirm
+      2) order    — buy zone (EMA support → limit) + stop + 1R value
+      3) targets  — T1/T2 as R-multiples + share size + THB risk + composite-quintile tilt
+    Degrades gracefully when the enrichment fields (vol_x/ema) or the tilt are absent."""
+    nm = _eod_name({"ticker": sym, "quintile": p.get("quintile")})
+    buy = p.get("buy", p.get("close"))
+    ema = p.get("ema")
+    riskU = p.get("riskU") or 0.0
+
+    # 1) headline — a dip signal is by construction above a rising EMA20/200 (uptrend).
+    ctx = [f"เหนือ EMA20 +{(buy / ema - 1) * 100:.1f}%"] if ema and buy else []
+    ctx.append("200D ขาขึ้น")
+    head = f"{nm} · dip เด้ง EMA20 · {' · '.join(ctx)} · RSI {p['rsi']:.0f} ADX {p['adx']:.0f}"
+    volx = p.get("vol_x")
+    if volx:
+        head += f" · vol {volx:.1f}× ({'ยืนยัน' if volx >= 1 else 'บาง'})"
+
+    # 2) order — buy anywhere from the EMA support up to the signal close ("ราคานี้หรือดีกว่า").
+    zone = f"{min(ema, buy):.2f}–{buy:.2f}" if ema else f"≤{buy:.2f}"
+    order = f"   โซนซื้อ {zone} (limit ≤{buy:.2f}) · 🛑 {p['stop']:.2f} · 1R {riskU:.2f}"
+
+    # 3) targets/size/risk — T1/T2 in R, actual THB risk (size×1R after lot rounding), tilt.
+    def rmult(t):
+        return (t - buy) / riskU if riskU else 0.0
+    thb = (p.get("size") or 0) * riskU
+    tgt = (f"   🎯 T1 {p['t1']:.2f} (+{rmult(p['t1']):.1f}R) · T2 {p['t2']:.2f} (+{rmult(p['t2']):.1f}R)"
+           f" · size {p['size']:,} · เสี่ยง ฿{thb:,.0f}")
+    mult = p.get("size_mult")
+    if mult and mult != 1:
+        q = p.get("quintile")
+        tgt += f" · Q{q} {mult:g}×" if q else f" · ×{mult:g}"
+    return "\n".join([head, order, tgt])
 
 
 def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
@@ -243,11 +285,10 @@ def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
     if fired:
         lines.append(f"🆕 สัญญาณใหม่ (BUY limit วันถัดไป): {len(fired)}")
         for sym, p in fired[:6]:
-            nm = _eod_name({"ticker": sym, "quintile": p.get("quintile")})
-            lines.append(f"  {nm} ซื้อ {p.get('buy', p.get('close')):.2f}"
-                         f" · stop {p['stop']:.2f} · T1 {p['t1']:.2f} · size {p['size']:,}")
+            lines.append(_fmt_signal_detail(sym, p))
         if len(fired) > 6:
             lines.append(f"  … +{len(fired) - 6} ตัว")
+        lines.append("1R=ระยะถึง stop · เสี่ยง=size×1R (จริงหลังปัดล็อต) · vol=เทียบเฉลี่ย20วัน")
     else:
         lines.append("🆕 ไม่มีสัญญาณ BUY ใหม่วันนี้")
 

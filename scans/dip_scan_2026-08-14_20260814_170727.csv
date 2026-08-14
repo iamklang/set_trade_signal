@@ -1,0 +1,5 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+AMATA.BK,31.0,31.0,27.5,3.5,34.5,36.25,300,8.9452,67.3463,32.6976,dip|breakout,1.377,200,1.5,1.0,1,,insufficient data,2026-08-14 17:20
+BH.BK,194.5,194.5,186.5,8.0,202.5,206.5,0,3.2923,66.049,24.4375,dip|breakout,-0.465,100,0.75,1.0,4,True,confirmed,2026-08-14 17:20
+CBG.BK,54.75,54.75,50.0,4.75,59.5,61.875,200,6.9128,71.024,20.2559,dip|breakout,-0.292,200,1.0,1.0,3,True,confirmed,2026-08-14 17:20
+KCE.BK,51.5,51.5,41.75,9.75,61.25,66.125,100,17.2343,71.5273,15.1171,breakout,2.028,100,1.5,1.0,1,False,"no-fresh-dip, adx 15<20",2026-08-14 17:20
