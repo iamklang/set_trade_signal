@@ -1,21 +1,16 @@
-SET Bull Scan (2026-08-18)
+SET Bull Scan (2026-08-19)
 
-ตลาด: 39/100 ขาขึ้น
-trigger: dip 3  brk 7  rcl 2
+ตลาด: 45/100 ขาขึ้น (บูลกว้าง)
+trigger: dip 1  brk 3  rcl 2
 
-★ Q1 leader + trigger (6):
+★ Q1 leader + trigger (1):
 Ticker  sig          Buy     Stop       T1     Size
 ---------------------------------------------------
-STECON  rcl        17.80    16.00    19.60      700
-KCE     brk        53.75    42.50    65.00        0*
-HANA    brk        49.00    35.50    62.50        0*
-SPRC    brk        12.00    10.30    13.70      700*
-BGRIM   dip+rcl    19.00    17.60    20.40    1,000
-PLANB   dip+brk     6.65     5.50     7.80    1,200*
+KCE     brk        55.50    42.50    68.50        0*
 
 Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
 
 วิเคราะห์:
-- ระวังยืด >10% (รอย่อ/ลดไซซ์): KCE*, HANA*, SPRC*, PLANB*
+- ระวังยืด >10% (รอย่อ/ลดไซซ์): KCE*
 
 ★=Q1 leader  *=ยืด >10% เหนือ EMA
