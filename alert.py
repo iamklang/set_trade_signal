@@ -265,6 +265,44 @@ def _fmt_signal_detail(sym, p):
     return "\n".join([head, order, tgt])
 
 
+def _ddmm(d):
+    """Compact 'DD/MM' from an ISO 'YYYY-MM-DD' date, or '-' when missing/malformed."""
+    parts = str(d or "").split("-")
+    return f"{parts[2]}/{parts[1]}" if len(parts) == 3 else "-"
+
+
+def _fmt_holding_detail(r):
+    """Two-line detail for one open position in the EOD brief:
+      1) status + P/L + entry(date/px) → latest + share size
+      2) effective stop (+cushion to it) + the live target (T1 before it hits, T2 once RUN)
+         + current market value. ⚠️ prefixes a position sitting within 3% of its stop."""
+    nm = _eod_name(r)
+    st = (r.get("status") or "?")
+    pl = r.get("pl_pct")
+    pl_s = f"{pl:+.1f}%" if pl is not None else "n/a"
+    entry = r.get("entry_close") or 0.0
+    cur = r.get("cur") or 0.0
+    size = r.get("size") or 0
+    stop = r.get("eff_stop") or r.get("stop") or 0.0
+    cushion = ((cur - stop) / cur * 100) if cur and stop and cur > 0 else None
+    warn = "⚠️ " if (cushion is not None and cushion < 3.0) else ""
+    head = (f"{warn}{nm} {st} {pl_s} · เข้า {_ddmm(r.get('entry_date'))} @{entry:.2f}"
+            f" → ล่าสุด {cur:.2f} · size {size:,}")
+
+    # Live target: still working T1 while HOLD; once RUN (past T1, stop at breakeven) aim T2.
+    # A RUN winner has no hard exit above T2 — it trails on eff_stop — so once price is past
+    # the target, drop the stale level and say it's letting the trail run instead.
+    tgt, tgt_lbl = (r.get("t2"), "T2") if st == "RUN" else (r.get("t1"), "T1")
+    cush_s = f" (เหลือ {cushion:.1f}%)" if cushion is not None else ""
+    line2 = f"   🛑 {stop:.2f}{cush_s}"
+    if tgt and cur < tgt:
+        line2 += f" · 🎯 {tgt_lbl} {tgt:.2f}"
+    elif st == "RUN":
+        line2 += " · ปล่อยวิ่ง (เลย T2 · trail 🛑)"
+    line2 += f" · มูลค่า ฿{cur * size:,.0f}"
+    return "\n".join([head, line2])
+
+
 def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
                      scan_date="", regime_factor=1.0, warnings=None):
     """Analytical EOD brief (console + LINE, same style as the morning ready brief). Distills
@@ -306,7 +344,8 @@ def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
     else:
         lines.append("\n📌 ไม่มี exit / T1 วันนี้")
 
-    # Portfolio health.
+    # Portfolio health — summary header, then every open position in detail (best→worst P/L,
+    # so leaders sit on top and near-stop laggards fall to the bottom with a ⚠️ marker).
     if holding:
         wins = [r for r in holding if (r.get("pl_pct") or 0) > 0]
         loss = [r for r in holding if (r.get("pl_pct") or 0) < 0]
@@ -314,19 +353,9 @@ def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
                      for r in holding)
         lines.append(f"\n📈 พอร์ต {len(holding)} ตัว · กำไร {len(wins)} / ขาดทุน {len(loss)}"
                      f" · unrealized ฿{unreal:,.0f}")
-        top = [r for r in sorted(holding, key=lambda r: -(r.get("pl_pct") or 0))
-               if (r.get("pl_pct") or 0) > 0][:3]
-        if top:
-            lines.append("  🏆 นำ: " + " · ".join(f"{_eod_name(r)} {r['pl_pct']:+.1f}%" for r in top))
-
-        def cushion(r):
-            cur, st = r.get("cur"), (r.get("eff_stop") or r.get("stop"))
-            return ((cur - st) / cur * 100) if cur and st and cur > 0 else 99.0
-
-        watch = sorted([r for r in holding if cushion(r) < 3.0], key=cushion)
-        if watch:
-            lines.append("  ⚠️ ใกล้ stop: "
-                         + " · ".join(f"{_eod_name(r)} (เหลือ {cushion(r):.1f}%)" for r in watch[:4]))
+        for r in sorted(holding, key=lambda r: -(r.get("pl_pct") or 0)):
+            lines.append(_fmt_holding_detail(r))
+        lines.append("Stat: HOLD=ก่อน T1 · RUN=ล็อกทุนแล้วปล่อยวิ่ง · เหลือ%=ระยะถึง stop · ⚠️=ใกล้ stop <3%")
 
     if capital_info:
         lines.append(f"\n💰 ทุน: ใช้ ฿{capital_info['committed']:,.0f}"
