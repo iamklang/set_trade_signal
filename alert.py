@@ -271,11 +271,12 @@ def _ddmm(d):
     return f"{parts[2]}/{parts[1]}" if len(parts) == 3 else "-"
 
 
-def _fmt_holding_detail(r):
+def _fmt_holding_detail(r, scan_date=None):
     """Two-line detail for one open position in the EOD brief:
       1) status + P/L + entry(date/px) → latest + share size
       2) effective stop (+cushion to it) + the live target (T1 before it hits, T2 once RUN)
-         + current market value. ⚠️ prefixes a position sitting within 3% of its stop."""
+         + current market value. 🆕 prefixes a position the dip scan entered THIS session
+         (entry_date==scan_date); ⚠️ prefixes one sitting within 3% of its stop."""
     nm = _eod_name(r)
     st = (r.get("status") or "?")
     pl = r.get("pl_pct")
@@ -285,8 +286,9 @@ def _fmt_holding_detail(r):
     size = r.get("size") or 0
     stop = r.get("eff_stop") or r.get("stop") or 0.0
     cushion = ((cur - stop) / cur * 100) if cur and stop and cur > 0 else None
+    new_badge = "🆕 " if (scan_date and r.get("entry_date") == scan_date) else ""
     warn = "⚠️ " if (cushion is not None and cushion < 3.0) else ""
-    head = (f"{warn}{nm} {st} {pl_s} · เข้า {_ddmm(r.get('entry_date'))} @{entry:.2f}"
+    head = (f"{new_badge}{warn}{nm} {st} {pl_s} · เข้า {_ddmm(r.get('entry_date'))} @{entry:.2f}"
             f" → ล่าสุด {cur:.2f} · size {size:,}")
 
     # Live target: still working T1 while HOLD; once RUN (past T1, stop at breakeven) aim T2.
@@ -319,14 +321,27 @@ def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
     if regime_factor < 1.0:
         lines.append(f"⚠️ ตลาด RISK-OFF → ลดขนาดโพซิชันใหม่ ×{regime_factor}\n")
 
-    # New signals — next-day limit orders (the actionable output).
-    if fired:
-        lines.append(f"🆕 สัญญาณใหม่ (BUY limit วันถัดไป): {len(fired)}")
-        for sym, p in fired[:6]:
-            lines.append(_fmt_signal_detail(sym, p))
-        if len(fired) > 6:
-            lines.append(f"  … +{len(fired) - 6} ตัว")
-        lines.append("1R=ระยะถึง stop · เสี่ยง=size×1R (จริงหลังปัดล็อต) · vol=เทียบเฉลี่ย20วัน")
+    # New entries this session. Two sources, kept distinct:
+    #   • เข้าใหม่วันนี้ — dips the SET100 scan (scan_dip) actually auto-entered into the managed
+    #     book today (entry_date==scan_date). This is the real dip output; without it a dip like
+    #     STGT enters positions.json but the brief still says "ไม่มีสัญญาณ" (the watchlist is only
+    #     4 held names, so `fired` is almost always empty).
+    #   • สัญญาณ watchlist — next-day BUY-limit signals off the small manual watchlist.txt.
+    new_today = [r for r in holding if scan_date and r.get("entry_date") == scan_date]
+    if new_today or fired:
+        if new_today:
+            lines.append(f"🆕 เข้าใหม่วันนี้ (dip เข้าพอร์ต): {len(new_today)}")
+            for r in sorted(new_today, key=lambda r: -(r.get("pl_pct") or 0)):
+                lines.append(f"  {_eod_name(r)} @{r.get('entry_close') or 0:.2f}"
+                             f" · 🛑 {r.get('stop') or 0:.2f} · 🎯 T1 {r.get('t1') or 0:.2f}"
+                             f" · size {r.get('size') or 0:,}")
+        if fired:
+            lines.append(f"🎯 สัญญาณ watchlist (BUY limit วันถัดไป): {len(fired)}")
+            for sym, p in fired[:6]:
+                lines.append(_fmt_signal_detail(sym, p))
+            if len(fired) > 6:
+                lines.append(f"  … +{len(fired) - 6} ตัว")
+            lines.append("1R=ระยะถึง stop · เสี่ยง=size×1R (จริงหลังปัดล็อต) · vol=เทียบเฉลี่ย20วัน")
     else:
         lines.append("🆕 ไม่มีสัญญาณ BUY ใหม่วันนี้")
 
@@ -354,8 +369,9 @@ def build_eod_report(fired, holding, sell_today, t1_today, capital_info,
         lines.append(f"\n📈 พอร์ต {len(holding)} ตัว · กำไร {len(wins)} / ขาดทุน {len(loss)}"
                      f" · unrealized ฿{unreal:,.0f}")
         for r in sorted(holding, key=lambda r: -(r.get("pl_pct") or 0)):
-            lines.append(_fmt_holding_detail(r))
-        lines.append("Stat: HOLD=ก่อน T1 · RUN=ล็อกทุนแล้วปล่อยวิ่ง · เหลือ%=ระยะถึง stop · ⚠️=ใกล้ stop <3%")
+            lines.append(_fmt_holding_detail(r, scan_date=scan_date))
+        lines.append("Stat: HOLD=ก่อน T1 · RUN=ล็อกทุนแล้วปล่อยวิ่ง · เหลือ%=ระยะถึง stop"
+                     " · 🆕=เข้าวันนี้ · ⚠️=ใกล้ stop <3%")
 
     if capital_info:
         lines.append(f"\n💰 ทุน: ใช้ ฿{capital_info['committed']:,.0f}"
