@@ -1,23 +1,13 @@
-SET Bull Scan (2026-08-21)
+SET Bull Scan (2026-08-24)
 
-ตลาด: 52/100 ขาขึ้น (บูลกว้าง)
-trigger: dip 3  brk 4  rcl 4
+ตลาด: 45/100 ขาขึ้น (บูลกว้าง)
+trigger: brk 1  rcl 1
 
-★ Q1 leader + trigger (6):
+★ Q1 leader + trigger (1):
 Ticker  sig          Buy     Stop       T1     Size
 ---------------------------------------------------
-SPRC    brk        13.00    10.60    15.40      600*
-TOP     dip+rcl    64.00    61.00    67.00      400
-PTTGC   dip+brk    41.75    37.00    46.50      300
-RCL     brk        46.25    33.87    58.63        0*
-BCP     dip        50.00    45.25    54.75      300
-STA     brk        20.90    17.60    24.20      400*
+BCP     brk        51.25    46.75    55.75      300
 
 Buy=ราคา limit วันถัดไป (ที่ราคานี้หรือดีกว่า) · dip=ย่อชน EMA เด้ง · brk=นิวไฮ20วัน · rcl=กลับเหนือ EMA20
-
-วิเคราะห์:
-- เข้าง่าย/เสี่ยงต่ำ (ชิด EMA+ADXแข็ง): TOP
-- ระวังยืด >10% (รอย่อ/ลดไซซ์): SPRC*, RCL*, STA*
-- overbought RSI≥78: SPRC, RCL
 
 ★=Q1 leader  *=ยืด >10% เหนือ EMA

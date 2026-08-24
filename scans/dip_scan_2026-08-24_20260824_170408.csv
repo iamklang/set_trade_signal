@@ -1,0 +1,2 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+BCP.BK,51.25,51.25,46.75,4.5,55.75,58.0,300,9.1805,73.6986,64.9066,breakout,0.743,200,1.5,1.0,1,False,no-fresh-dip,2026-08-24 17:04

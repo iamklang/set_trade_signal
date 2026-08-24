@@ -1,5 +1,5 @@
 ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
-BCP.BK,49.75,49.75,45.25,4.5,54.25,56.5,300,7.074,70.1302,65.1681,dip,0.743,200,1.5,1.0,1,,insufficient data,2026-08-21 17:22
+BCP.BK,49.75,49.75,45.25,4.5,54.25,56.5,300,7.074,70.1302,65.1681,dip,0.743,200,1.5,1.0,1,True,confirmed,2026-08-24 17:04
 SPRC.BK,13.0,13.0,10.6,2.4,15.4,16.6,0,16.7087,80.4798,57.172,breakout,2.433,400,1.5,1.0,1,False,no-fresh-dip,2026-08-21 17:22
 RCL.BK,46.25,46.25,33.8673,12.3827,58.6327,64.824,0,18.9505,88.7976,47.7824,breakout,0.898,0,1.5,1.0,1,False,no-fresh-dip,2026-08-21 17:22
 TOP.BK,64.0,64.0,61.0,3.0,67.0,68.5,0,1.04,55.2567,30.7513,dip,1.252,200,1.5,1.0,1,True,confirmed,2026-08-21 17:22
