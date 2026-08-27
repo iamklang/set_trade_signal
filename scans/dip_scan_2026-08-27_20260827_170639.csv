@@ -1,0 +1,5 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+AMATA.BK,33.0,33.0,29.1599,3.8401,36.8401,38.7601,300,11.7268,70.2056,40.1924,dip|breakout,1.191,200,1.5,1.0,1,True,confirmed,2026-08-27 17:06
+SPALI.BK,16.5,16.5,15.7664,0.7336,17.2336,17.6004,0,3.7782,69.1896,27.499,dip|breakout,-0.657,600,0.75,1.0,4,True,confirmed,2026-08-27 17:06
+STA.BK,21.2,21.2,17.5522,3.6478,24.8478,26.6716,0,11.4292,70.4656,22.0386,dip|breakout,0.526,200,1.25,1.0,2,True,confirmed,2026-08-27 17:06
+SIRI.BK,1.49,1.49,1.4507,0.0393,1.5293,1.549,400,1.3934,60.6073,20.505,dip,-0.478,7000,0.75,1.0,4,True,confirmed,2026-08-27 17:06
