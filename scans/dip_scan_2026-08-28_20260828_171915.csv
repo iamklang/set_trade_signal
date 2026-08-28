@@ -1,0 +1,6 @@
+ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
+SPRC.BK,12.6,12.6,10.5703,2.0297,14.6297,15.6445,600,11.3665,72.3422,54.7629,breakout,2.707,400,1.5,1.0,1,False,no-fresh-dip,2026-08-28 17:19
+GUNKUL.BK,5.3,5.3,4.92,0.38,5.68,5.87,900,4.2768,63.75,30.8998,dip,2.833,2300,1.5,1.0,1,True,confirmed,2026-08-28 17:19
+RATCH.BK,38.0,38.0,36.0,2.0,40.0,41.0,0,1.325,55.4042,29.9102,dip,0.361,300,1.25,1.0,2,True,confirmed,2026-08-28 17:19
+EGCO.BK,135.5,135.5,128.0,7.5,143.0,146.75,0,2.8603,64.4203,21.4186,dip|breakout,-0.15,0,1.0,1.0,3,True,confirmed,2026-08-28 17:19
+IVL.BK,24.2,24.2,21.1081,3.0919,27.2919,28.8378,0,8.941,68.4073,19.3626,breakout,-0.47,300,0.75,1.0,4,False,adx 19<20,2026-08-28 17:19
