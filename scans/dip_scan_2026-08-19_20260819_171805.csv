@@ -1,5 +1,0 @@
-ticker,close,buy,stop,riskU,t1,t2,size,distPct,rsi,adx,signals,comp,size_base,size_mult,regime_mult,quintile,validated,validate_reason,validated_at
-KKP.BK,112.5,112.5,108.0,4.5,117.0,119.25,100,1.5805,56.5766,27.4208,dip,,100,1.0,1.0,,True,confirmed,2026-08-19 17:18
-KCE.BK,55.5,55.5,42.5,13.0,68.5,75.0,0,19.143,76.7378,21.7371,breakout,2.114,0,1.5,1.0,1.0,False,no-fresh-dip,2026-08-19 17:18
-STA.BK,19.9,19.9,17.6,2.3,22.2,23.35,200,7.2811,67.7494,15.1882,breakout,0.154,400,1.0,1.0,3.0,False,adx 15<20,2026-08-19 17:18
-STGT.BK,11.3,11.3,10.5,0.8,12.1,12.5,100,5.0146,68.4333,13.3099,breakout,0.261,1200,1.25,1.0,2.0,False,adx 13<20,2026-08-19 17:18

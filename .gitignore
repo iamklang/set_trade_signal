@@ -5,6 +5,9 @@ __pycache__/
 # regenerable price cache (yfinance)
 data/*.csv
 
+# regenerable meta-labeling datasets (rebuild via meta_label.py)
+reports/meta_dataset*.csv
+
 # runtime logs
 logs/
 *.log
