@@ -105,9 +105,20 @@ net of tickliq cost (CAGR 23.6%, Sharpe 1.65, PF 2.45). The volume gate is the
 single most load-bearing filter; `vol_mult > 1` was correctly REJECTED as a 10y
 mirage. See [[algo-config-2026q3]]. New proposals must clear the same bar.
 
+## Closed experiments (don't re-litigate)
+
+**Meta-labeling `dip_or_brk` — REJECTED (2026-08-30).** Ran the full Phase 1/2
+build (`meta_label.py` + `meta_train.py`, /quant-meta-label). Across both label
+designs (+1R barrier AND live let-winners-run) and a 0/0.2/0.6% cost sweep the
+secondary never cleared Gate 1: best-gate DSR 0.78 → 0.23. The per-name equity
+edge is thin (weighted Sharpe ~0.03 gross) and cost-fragile. Edge lives in
+cross-sectional selection + DW gearing, not per-trigger timing — ML can't filter
+it. Do NOT retry meta-labeling expecting a different answer. See
+[[quant-meta-label-skill]].
+
 ## Highest-value next experiment
 
-**Meta-labeling** the existing `dip_or_brk` signal: keep the current trigger as
-the high-recall primary model, train a secondary binary classifier to decide
-bet/no-bet and size. Validate the secondary model through Gates 1–5 (triple-
-barrier labels, purged CPCV). See [[quant-knowledge-base]] Pillar 4.
+**Fix 3 — the primary's TRUE DW expectancy.** The per-name study above is
+equity-only; measure `dip_or_brk`'s expectancy net of **DW gearing / IV crush /
+theta + board-lot** via /set-dw. That is Gate 5 for the live book and the one
+number still missing. See [[quant-knowledge-base]] Pillar 3.
