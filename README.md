@@ -108,6 +108,21 @@ Skills: `/us-swing` (master), `/us-macro`, `/us-entry`, `/us-earnings`, `/us-opt
 | `bt_holdout.py` | Time-split holdout: composite weight overfitting check |
 | `bt_quality.py` | ROE quality factor improvement test |
 
+## Quant Validation & Meta-Labeling
+
+เครื่องมือตรวจ edge แบบ López de Prado / Bailey — "โรงงาน validate" สำหรับกลั่นไอเดียก่อนเชื่อ backtest ใดๆ (zero-dep, numpy/pandas เท่านั้น)
+
+| Script | หน้าที่ | ตัวอย่าง |
+|---|---|---|
+| `meta_label.py` | สร้าง dataset: ทุก `buy_signal` trigger → label (triple-barrier **หรือ** let-winners-run จริง) + point-in-time features + LdP sample-uniqueness weight + `ret_R` | `python meta_label.py --universe set100.bk.txt --years 12 --exit trail --out reports/meta_dataset_set_trail.csv` |
+| `meta_train.py` | Validate อย่างซื่อสัตย์: purged+embargo CV, weighted Sharpe/PSR/**Deflated Sharpe** (Kish n_eff), MDA importance, baseline vs gated | `python meta_train.py --data reports/meta_dataset_set_trail.csv --cost 0.006` |
+
+อ่านผล: `CV AUC` (0.5 = ไร้ skill), ตาราง sleeve (primary vs gated), **`DSR` ต้อง > 0.95** จึงจะ DEPLOY
+
+**Options:** `--exit trail|barrier` · `--cost 0|0.002|0.006` (round-trip fraction) · `--folds 5` · `--embargo 20` · `--market 0|1` (SET/US)
+
+> 📌 **ผลสรุป (experiment CLOSED — REJECTED):** meta-labeling บน `dip_or_brk` **ไม่ผ่าน** — secondary ไม่เคยแตะ DSR > 0.95 ที่ cost ใดเลย (0.78 gross → 0.23 ที่ 0.6%); "skill" ที่เห็น (AUC 0.56) มาจากฟีเจอร์ `riskU_pct` (ความกว้าง stop) ตัวเดียวแบบ degenerate ตัดออกแล้ว AUC เหลือ 0.53 (เกือบเดาสุ่ม) **edge จริงอยู่ที่ cross-sectional selection + DW gearing ไม่ใช่ per-trigger timing** → เก็บระบบเดิมไว้ ไม่ต้องเพิ่ม ML layer datasets เป็น artifact regenerable (gitignored)
+
 ## Entry Signals
 
 Live default = `--entry dip_or_brk` — เข้าซื้อเมื่อ **ตัวใดตัวหนึ่ง** เข้าเงื่อนไข:
@@ -152,6 +167,8 @@ HOLDING/FULL ────▶ HOLDING/RUN ─────────────
 | `positions.py` | Stateful lifecycle engine: update, opportunity_score, capital tracking |
 | `composite.py` | Cross-sectional multi-factor ranking (momentum + trend) |
 | `costs.py` | SET cost model (tick-based spread + commission) |
+| `meta_label.py` | Meta-labeling dataset builder: triple-barrier / let-winners-run labels + uniqueness weights (`/quant-meta-label`) |
+| `meta_train.py` | Honest validation: purged CV, Deflated Sharpe, MDA (`/quant-validation`) — zero-dep numpy |
 | `profiles.py` | Per-stock parameter overrides (RSI/ADX thresholds) |
 | `set_data.py` | Data source: SET official (Playwright) or Yahoo Finance |
 | `line_notify.py` | LINE Messaging API push notifications |
@@ -172,6 +189,8 @@ Slash commands สำหรับใช้ใน Claude Code — แต่ละ
 | `/set-dw` | เลือก DW series: delta, effective gearing, IV, expiry |
 | `/set-risk` | Sizing (lot 100), exits, lifecycle, position cap, rotation |
 | `/set-evidence` | Backtest results, อะไรผ่าน/ไม่ผ่าน, limitations |
+| `/quant-validation` | ประตูกัน overfitting: 5 gates (DSR, purged CPCV, OU stop, SET/DW re-test) — "honest no" ก่อนเชื่อ backtest |
+| `/quant-meta-label` | Recipe meta-labeling บน `buy_signal` (triple-barrier + purged CV) — ปิดเคสแล้ว (REJECTED) แต่เก็บวิธีไว้ |
 
 **US (S&P 500)** — ตรรกะเดียวกัน พอร์ตแยก (ดู `/us-evidence` เรื่อง validation):
 
@@ -219,7 +238,7 @@ trading_dr/
   docs/              คู่มือ + specs/
   data/              regenerable price cache (gitignored)
   logs/              runtime logs (gitignored)
-  reports/           quarterly HTML
+  reports/           quarterly HTML + meta_dataset_*.csv (gitignored, regenerable)
   tests/             pytest suite
   .claude/           skills/ (set-* + us-*) + agents/
 ```
